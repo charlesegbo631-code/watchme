@@ -1,73 +1,163 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
   <title>Checkout - Charlie's Dropship</title>
   <style>
-    body{font-family:Arial;background:#f3f4f6;margin:0;padding:20px;}
-    .card{background:#fff;padding:16px;border-radius:12px;max-width:500px;margin:auto;box-shadow:0 2px 8px rgba(0,0,0,0.05);}
-    .cart-item{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:8px 0;}
-    .cart-btn{background:#0ea5a4;color:#fff;padding:10px 16px;border:none;border-radius:8px;cursor:pointer;margin-top:10px;}
-    .remove-btn{background:#ef4444;color:#fff;padding:4px 8px;border:none;border-radius:6px;cursor:pointer;}
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      padding: 16px;
+      border-radius: 12px;
+      max-width: 500px;
+      margin: auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #eee;
+      padding: 8px 0;
+    }
+    .cart-btn {
+      background: #0ea5a4;
+      color: #fff;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+    }
+    .remove-btn {
+      background: #ef4444;
+      color: #fff;
+      padding: 4px 8px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    input, textarea {
+      width: 100%;
+      margin: 6px 0;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>Checkout</h2>
+
+    <!-- Cart Items -->
     <div id="cartList"></div>
     <div style="display:flex;justify-content:space-between;font-weight:bold;margin-top:10px">
-      <span>Total</span><span id="cartTotal">$0.00</span>
+      <span>Total</span><span id="cartTotal">₦0.00</span>
     </div>
 
+    <!-- Customer Details -->
     <h3>Your Details</h3>
-    <input id="custName" placeholder="Full Name"><br>
-    <input id="custEmail" type="email" placeholder="Email"><br>
-    <input id="custPhone" placeholder="Phone"><br>
-    <textarea id="custAddress" placeholder="Shipping Address"></textarea><br>
+    <input id="custName" placeholder="Full Name" required>
+    <input id="custEmail" type="email" placeholder="Email" required>
+    <input id="custPhone" placeholder="Phone" required>
+    <textarea id="custAddress" placeholder="Shipping Address" required></textarea>
 
+    <!-- Payment Buttons -->
     <button id="checkoutPaystack" class="cart-btn">Pay with Paystack</button>
-    <button id="checkoutOpay" class="cart-btn" style="background:#0045BA"></button>
+    <button id="checkoutOpay" class="cart-btn" style="background:#0045BA">Pay with OPay</button>
   </div>
 
 <script>
-const API='/api';
-let cart = JSON.parse(localStorage.getItem('ds_cart')||'[]');
+const API = '/api';
+let cart = JSON.parse(localStorage.getItem('ds_cart') || '[]');
 
-const cartList=document.getElementById('cartList');
-const cartTotal=document.getElementById('cartTotal');
+const cartList = document.getElementById('cartList');
+const cartTotal = document.getElementById('cartTotal');
 
-function renderCart(){
-  cartList.innerHTML=''; let total=0;
-  cart.forEach((i,idx)=>{
-    total+=i.price*i.quantity;
-    const row=document.createElement('div'); row.className='cart-item';
-    row.innerHTML=`<div>${i.title} x${i.quantity}</div><div>$${(i.price*i.quantity).toFixed(2)} <button class="remove-btn" onclick="removeItem(${idx})">x</button></div>`;
+// Format price depending on currency
+function formatPrice(amount, currency) {
+  return currency === "USD"
+    ? `$${amount.toFixed(2)}`
+    : amount.toLocaleString("en-NG", { style: "currency", currency: "NGN" });
+}
+
+function renderCart() {
+  cartList.innerHTML = '';
+  let total = 0;
+  let currency = cart[0]?.currency || "USD"; // use first item’s currency as default
+
+  cart.forEach((item, idx) => {
+    total += item.price * item.quantity;
+    const row = document.createElement('div');
+    row.className = 'cart-item';
+    row.innerHTML = `
+      <div>${item.title} × ${item.quantity}</div>
+      <div>${formatPrice(item.price * item.quantity, item.currency)} 
+        <button class="remove-btn" onclick="removeItem(${idx})">x</button>
+      </div>`;
     cartList.appendChild(row);
   });
-  cartTotal.textContent=`$${total.toFixed(2)}`;
+
+  cartTotal.textContent = formatPrice(total, currency);
 }
-function removeItem(idx){ cart.splice(idx,1); localStorage.setItem('ds_cart',JSON.stringify(cart)); renderCart(); }
+
+function removeItem(idx) {
+  cart.splice(idx, 1);
+  localStorage.setItem('ds_cart', JSON.stringify(cart));
+  renderCart();
+}
+
 renderCart();
 
-// Paystack
-document.getElementById('checkoutPaystack').onclick=async()=>{
-  if(cart.length===0){alert("Cart is empty");return;}
-  const customer={name:custName.value,email:custEmail.value,phone:custPhone.value,address:custAddress.value};
-  const res=await fetch(`${API}/create-paystack-order`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cartItems:cart,customer})});
-  const data=await res.json();
-  if(data.success&&data.authorizationUrl) window.location.href=data.authorizationUrl;
-  else alert("Paystack error "+data.error);
+// Paystack Checkout
+document.getElementById('checkoutPaystack').onclick = async () => {
+  if (cart.length === 0) { alert("Cart is empty"); return; }
+  const customer = {
+    name: custName.value,
+    email: custEmail.value,
+    phone: custPhone.value,
+    address: custAddress.value
+  };
+  const res = await fetch(`${API}/create-paystack-order`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cartItems: cart, customer })
+  });
+  const data = await res.json();
+  if (data.success && data.authorizationUrl) {
+    window.location.href = data.authorizationUrl;
+  } else {
+    alert("Paystack error: " + (data.error || "Unknown error"));
+  }
 };
 
-// OPay
-document.getElementById('checkoutOpay').onclick=async()=>{
-  if(cart.length===0){alert("Cart is empty");return;}
-  const customer={name:custName.value,email:custEmail.value,phone:custPhone.value,address:custAddress.value};
-  const res=await fetch(`${API}/create-opay-session`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cartItems:cart,customer})});
-  const data=await res.json();
-  const payUrl=data?.data?.data?.link||data?.data?.data?.cashierUrl;
-  if(payUrl) window.location.href=payUrl;
-  else alert("OPay error "+data.error);
+// OPay Checkout
+document.getElementById('checkoutOpay').onclick = async () => {
+  if (cart.length === 0) { alert("Cart is empty"); return; }
+  const customer = {
+    name: custName.value,
+    email: custEmail.value,
+    phone: custPhone.value,
+    address: custAddress.value
+  };
+  const res = await fetch(`${API}/create-opay-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cartItems: cart, customer })
+  });
+  const data = await res.json();
+  const payUrl = data?.data?.data?.link || data?.data?.data?.cashierUrl;
+  if (payUrl) {
+    window.location.href = payUrl;
+  } else {
+    alert("OPay error: " + (data.error || "Unknown error"));
+  }
 };
 </script>
 </body>
