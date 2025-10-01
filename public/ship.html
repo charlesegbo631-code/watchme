@@ -426,63 +426,81 @@ async function loadProducts() {
   row2.innerHTML = "";
 
   PRODUCTS.forEach((p, i) => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <img src="${p.img}">
-      <h4>${p.title}</h4>
-      <div class="small">SKU: ${p.supplier_sku || ""}</div>
-      <div class="price">$${p.price_usd.toFixed(2)}</div>
-      <div class="actions">
-        <div class="qty-wrapper">
-          <label>Qty:</label>
-          <input type="number" min="1" value="1" class="qty-input">
+    const cardHTML = `
+      <div class="card">
+        <img src="${p.img}" alt="${p.title}" onerror="this.src='/placeholder.png'">
+        <h4>${p.title}</h4>
+        <div class="small">SKU: ${p.supplier_sku || ""}</div>
+        <div class="price">
+          ${currentCurrency === "USD"
+            ? `$${p.price_usd.toFixed(2)}`
+            : p.price_ngn.toLocaleString("en-NG", { style: "currency", currency: "NGN" })}
         </div>
-        <div class="btns">
-          <button class="cart-btn add-btn" data-id="${p.id}">Add to Cart</button>
-          <button class="cart-btn buy buy-btn" data-id="${p.id}">Buy Now</button>
+        <div class="actions">
+          <div class="qty-wrapper">
+            <label>Qty:</label>
+            <input type="number" min="1" value="1" class="qty-input">
+          </div>
+          <div class="btns">
+            <button class="cart-btn add-btn" data-id="${p.id}">Add to Cart</button>
+            <button class="cart-btn buy buy-btn" data-id="${p.id}">Buy Now</button>
+          </div>
         </div>
-      </div>`;
+      </div>
+    `;
 
-    productsGrid.appendChild(card); // desktop
-    (i % 2 === 0 ? row1 : row2).appendChild(card.cloneNode(true)); // mobile
+    // desktop
+    productsGrid.insertAdjacentHTML("beforeend", cardHTML);
+
+    // mobile (alternate rows)
+    (i % 2 === 0 ? row1 : row2).insertAdjacentHTML("beforeend", cardHTML);
   });
 
-      // Add to Cart
-      productsGrid.querySelectorAll('.add-btn').forEach(btn=>btn.onclick=()=>{
-        const prod = PRODUCTS.find(x=>x.id==btn.dataset.id);
-        const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value)||1;
-        const ex = cart.find(c=>c.id==prod.id);
-        if(ex) ex.quantity+=qty;
+  // bind events for ALL .add-btn and .buy-btn
+document.querySelectorAll('.add-btn').forEach(btn => {
+  btn.replaceWith(btn.cloneNode(true));
+});
+document.querySelectorAll('.add-btn').forEach(btn => {
+  btn.onclick = () => {
+      const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
+      const qty = Math.max(1, parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1);
+      const ex = cart.find(c => c.id == prod.id);
+      if (ex) ex.quantity += qty;
       else cart.push({
-  id: prod.id,
-  title: prod.title,
-  price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
-  currency: currentCurrency,
-  quantity: qty
-});
-
-        saveCart();
+        id: prod.id,
+        title: prod.title,
+        price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
+        currency: currentCurrency,
+        quantity: qty
       });
+      saveCart();
+    };
+  });
 
-// Buy Now
-productsGrid.querySelectorAll('.buy-btn').forEach(btn => btn.onclick = () => {
-  const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
-  const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1;
+  document.querySelectorAll('.buy-btn').forEach(btn => {
+    btn.onclick = () => {
+      const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
+      const qty = Math.max(1, parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1);
+      cart = [{
+        id: prod.id,
+        title: prod.title,
+        price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
+        currency: currentCurrency,
+        quantity: qty
+      }];
+      saveCart();
+      window.location.href = "/checkout.html";
+    };
+  });
 
-  cart = [{
-    id: prod.id,
-    title: prod.title,
-    price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
-    currency: currentCurrency,
-    quantity: qty
-  }];
+  // bind slider arrows
+  document.querySelectorAll(".row-container").forEach(container => {
+    const row = container.querySelector(".row-slider");
+    container.querySelector(".left").onclick = () => row.scrollBy({ left: -250, behavior: "smooth" });
+    container.querySelector(".right").onclick = () => row.scrollBy({ left: 250, behavior: "smooth" });
+  });
+}
 
-  saveCart();
-  window.location.href = "/checkout.html";
-});
-    }
-  }
   // ===== Orders =====
   async function loadOrders(){
     const res = await fetch(`${API}/orders`); const data = await res.json();
