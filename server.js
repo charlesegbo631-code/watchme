@@ -216,6 +216,7 @@ app.get("/api/rates", async (req, res) => {
 // ✅ Create Paystack Order
 // ---------- Paystack ----------
 // ✅ Create Paystack Order (improved logging)
+// ✅ Create Paystack Order (no USD→NGN conversion)
 async function createPaystackOrderHandler(req, res) {
   try {
     console.log("📥 Incoming /api/create-paystack-order body:", JSON.stringify(req.body, null, 2));
@@ -226,95 +227,59 @@ async function createPaystackOrderHandler(req, res) {
       return res.status(400).json({ success: false, message: "cartItems required" });
     }
 
-    // --- Calculate totals (USD cents -> USD)
-    let usdTotal = 0;
-    let usdSupplierTotal = 0;
+    // --- Calculate totals (already in NGN)
+    let ngnTotal = 0;
     for (const it of cartItems) {
-      const price = toCents(it.price);
-      const cost = toCents(it.supplierCost || 0);
+      const price = Number(it.price) || 0; // assume price already NGN
       const qty = parseInt(it.quantity || 1, 10);
-      usdTotal += price * qty;
-      usdSupplierTotal += cost * qty;
+      ngnTotal += price * qty;
     }
 
-    
-  // 1. Get live USD → NGN rate
-const usdToNgn = await fetchUsdToNgnRate();
+    // Paystack requires amount in kobo
+    const totalKobo = Math.round(ngnTotal * 100);
 
-// 2. Convert the cart total from USD → NGN
-const totalUsd = fromCents(usdTotal);
-const totalNaira = totalUsd * usdToNgn;
+    const payload = {
+      email: customer?.email || "guest@example.com",
+      amount: totalKobo, // kobo
+      currency: "NGN",
+      metadata: { cartItems, customer }
+    };
 
-// 3. Paystack needs kobo (₦ × 100)
-const totalKobo = Math.round(totalNaira * 100);
-
-// 4. Build Paystack payload
-const payload = {
-  email: customer?.email || "guest@example.com",
-  amount: totalKobo,   // ✅ now correct in kobo
-  currency: "NGN",     // ✅ Paystack knows it's naira
-  metadata: { cartItems, customer }
-};
-const url = "https://api.paystack.co/transaction/initialize";
-
+    const url = "https://api.paystack.co/transaction/initialize";
     const headers = {
       Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
       "Content-Type": "application/json"
     };
 
-    // --- DEBUG: outgoing request details
-    console.log("▶️ Paystack INIT call");
-    console.log("URL:", url);
-    console.log("Payload:", JSON.stringify(payload, null, 2));
-    // don't log full secret; show masked
-    console.log("Authorization:", typeof process.env.PAYSTACK_SECRET_KEY === "string" ? process.env.PAYSTACK_SECRET_KEY.slice(0,6) + "...(masked)" : process.env.PAYSTACK_SECRET_KEY);
+    console.log("▶️ Paystack INIT call", payload);
 
-    // --- Perform request
     const response = await axios.post(url, payload, { headers, timeout: 20000 });
 
-    // --- DEBUG: response details
-    console.log("✅ Paystack responded (status):", response.status);
-    console.log("Paystack body:", JSON.stringify(response.data, null, 2));
-
-    // Save draft order
+    // Save draft order (using NGN values directly)
     await createDraftOrder({
       paymentId: response.data.data.reference,
       cartItems,
       customer,
-      usdTotalCents: usdTotal,
+      usdTotalCents: 0,        // not used anymore
       koboTotal: totalKobo,
-      supplierTotal: usdSupplierTotal,
-      profitCents: usdTotal - usdSupplierTotal
+      supplierTotal: 0,        // adjust if you need supplier share in NGN
+      profitCents: 0           // adjust if needed
     });
 
     return res.json({
       success: true,
       authorizationUrl: response.data.data.authorization_url,
       reference: response.data.data.reference,
-      totalUsd: totalUsd,
+      totalNgn: ngnTotal,
       totalKobo
     });
   } catch (err) {
-    console.error("❌ create-paystack-order error");
-
-    // axios error -> show config, request, response (if present)
-    if (err.config) {
-      console.error("axios config/url:", err.config.url, err.config.method);
-    }
-    if (err.request) {
-      console.error("axios request made but no response (request object):", err.request && err.request._header ? "(has headers)" : "(no headers shown)");
-    }
-    if (err.response) {
-      console.error("Status:", err.response.status);
-      console.error("Response headers:", err.response.headers);
-      console.error("Response data:", typeof err.response.data === "string" ? err.response.data : JSON.stringify(err.response.data, null, 2));
-    } else {
-      console.error("Error message:", err.message);
-    }
-
-    return res.status(500).json({ success: false, error: err.message || "Paystack request failed" });
+    console.error("❌ create-paystack-order error", err.message);
+    if (err.response) console.error(err.response.data);
+    res.status(500).json({ success: false, error: err.message || "Paystack request failed" });
   }
 }
+
 
 app.post("/api/create-paystack-order", createPaystackOrderHandler);
 
