@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your Cart</title>
+<style>
+  body { font-family: Arial, sans-serif; padding:20px; background:#f9fafb; }
+  h1 { color:#0ea5a4; }
+  .cart-item { background:#fff; padding:12px; border-radius:10px; margin:10px 0; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+  <h1>🛒 Your Cart</h1>
+  <div id="cartItems"></div>
+  <button onclick="window.location.href='checkout.html'">Proceed to Checkout</button>
+
+<script>
+  let cart = JSON.parse(localStorage.getItem("ds_cart") || "[]");
+  const cartItemsDiv = document.getElementById("cartItems");
+
+  if(cart.length === 0){
+    cartItemsDiv.innerHTML = "<p>Your cart is empty.</p>";
+  } else {
+    cart.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "cart-item";
+      div.innerHTML = `
+        <strong>${item.title}</strong><br>
+        Qty: ${item.quantity} <br>
+        Price: ${item.currency} ${item.price}
+      `;
+      cartItemsDiv.appendChild(div);
+    });
+  }
+</script>
+</body>
+</html>

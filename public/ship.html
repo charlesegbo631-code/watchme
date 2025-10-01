@@ -249,7 +249,10 @@ label input {
 
 <header>
   <div class="brand">Charlie's Store</div>
-  <div class="cart-summary">🛒 Cart (<span id="cartCount">0</span>)</div>
+ <a href="cart.html" class="cart-summary" style="text-decoration:none; color:inherit;">
+  🛒 Cart (<span id="cartCount">0</span>)
+</a>
+
     <button id="toggleCurrency">Switch Currency</button>
 
 </header>
@@ -505,17 +508,24 @@ document.getElementById('whatsappBtn').addEventListener('click', () => {
         saveCart();
       });
 
-      // Buy Now
-      productsGrid.querySelectorAll('.buy-btn').forEach(btn=>btn.onclick=()=>{
-        const prod = PRODUCTS.find(x=>x.id==btn.dataset.id);
-        const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value)||1;
-        cart = [{id:prod.id,title:prod.title,price:parseFloat(prod.price)||0,quantity:qty}];
-        saveCart();
-        window.location.href="/checkout.html";
-      });
+// Buy Now
+productsGrid.querySelectorAll('.buy-btn').forEach(btn => btn.onclick = () => {
+  const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
+  const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1;
+
+  cart = [{
+    id: prod.id,
+    title: prod.title,
+    price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
+    currency: currentCurrency,
+    quantity: qty
+  }];
+
+  saveCart();
+  window.location.href = "/checkout.html";
+});
     }
   }
-
   // ===== Orders =====
   async function loadOrders(){
     const res = await fetch(`${API}/orders`); const data = await res.json();
