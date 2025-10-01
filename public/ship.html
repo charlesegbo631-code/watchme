@@ -480,28 +480,39 @@ document.querySelectorAll('.add-btn').forEach(btn => {
     };
   });
 
-  document.querySelectorAll('.buy-btn').forEach(btn => {
-    btn.onclick = () => {
-      const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
-      const qty = Math.max(1, parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1);
-      cart = [{
-        id: prod.id,
-        title: prod.title,
-        price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
-        currency: currentCurrency,
-        quantity: qty
-      }];
-      saveCart();
-      window.location.href = "/checkout.html";
-    };
-  });
+document.querySelectorAll('.buy-btn').forEach(btn => {
+  btn.replaceWith(btn.cloneNode(true));
+});
+document.querySelectorAll('.buy-btn').forEach(btn => {
+  btn.onclick = () => {
+    const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
+    const qty = Math.max(1, parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1);
+    cart = [{
+      id: prod.id,
+      title: prod.title,
+      price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
+      currency: currentCurrency,
+      quantity: qty
+    }];
+    saveCart();
+    window.location.href = "/checkout.html";
+  };
+});
 
-  // bind slider arrows
-  document.querySelectorAll(".row-container").forEach(container => {
-    const row = container.querySelector(".row-slider");
-    container.querySelector(".left").onclick = () => row.scrollBy({ left: -250, behavior: "smooth" });
-    container.querySelector(".right").onclick = () => row.scrollBy({ left: 250, behavior: "smooth" });
-  });
+
+// bind slider arrows (one card per click)
+document.querySelectorAll(".row-container").forEach(container => {
+  const rowSlider = container.querySelector(".row-slider");
+  const card = rowSlider.querySelector(".card");
+  const cardWidth = card ? card.offsetWidth + 16 : 250; // include gap
+
+  container.querySelector(".left").onclick = () =>
+    rowSlider.scrollBy({ left: -cardWidth, behavior: "smooth" });
+
+  container.querySelector(".right").onclick = () =>
+    rowSlider.scrollBy({ left: cardWidth, behavior: "smooth" });
+});
+
 }
 
   // ===== Orders =====
