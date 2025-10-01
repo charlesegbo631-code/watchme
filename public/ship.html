@@ -88,22 +88,28 @@ h2 { font-size:22px; margin:16px 0; font-weight:600; color:#111; }
 .slider-arrow.right { right:8px; }
 
 @media (max-width:600px) {
-  .grid {
+  .rows-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px; /* space between row1 and row2 */
+  }
+
+  .row-slider {
     display: grid;
-    grid-template-rows: repeat(2, auto);  /* 2 rows */
-    grid-auto-flow: column;               /* lay out by column */
-    grid-auto-columns: 100%;              /* 1 column wide per page */
-    overflow-x: auto;                     /* swipe left/right */
+    grid-auto-flow: column;       /* arrange items horizontally */
+    grid-auto-columns: 70%;       /* each card takes ~70% width */
+    overflow-x: auto;             /* allow horizontal scroll */
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     gap: 16px;
-    padding: 0 40px;
+    padding: 0 20px;
   }
 
-  .grid .card {
+  .row-slider .card {
     scroll-snap-align: start;
   }
 }
+
 
 
 /* ===== Admin Panel ===== */
@@ -222,7 +228,11 @@ label input {
   <h2>Products</h2>
   <div class="slider-wrapper">
     <button class="slider-arrow left">‹</button>
-    <div id="productsGrid" class="grid"></div>
+   <div class="rows-wrapper">
+  <div class="row-slider" id="row1"></div>
+  <div class="row-slider" id="row2"></div>
+</div>
+
     <button class="slider-arrow right">›</button>
   </div>
 </div>
@@ -369,76 +379,100 @@ document.getElementById('whatsappBtn').addEventListener('click', () => {
   function saveCart(){ localStorage.setItem('ds_cart', JSON.stringify(cart)); updateCartSummary(); }
   function updateCartSummary(){ cartCount.textContent = cart.reduce((sum,i)=>sum+i.quantity,0); }
 
-  // ===== Load Products =====
-  async function loadProducts(){
-    const res = await fetch(`${API}/products`); 
-    const data = await res.json();
-    if(data.success){ 
-      PRODUCTS = data.products; 
-      productsGrid.innerHTML='';
-      
-      PRODUCTS.forEach(p=>{
-        const card = document.createElement('div'); 
-        card.className='card';
-        card.innerHTML = `
-          <img src="${p.img}">
-          <h4>${p.title}</h4>
-          <div class="small">SKU: ${p.supplier_sku||''}</div>
+// ===== Load Products =====
+async function loadProducts() {
+  const res = await fetch(`${API}/products`); 
+  const data = await res.json();
+  if (data.success) { 
+    PRODUCTS = data.products; 
+    const row1 = document.getElementById('row1');
+    const row2 = document.getElementById('row2');
+    row1.innerHTML = '';
+    row2.innerHTML = '';
+
+    PRODUCTS.forEach((p, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <img src="${p.img}">
+        <h4>${p.title}</h4>
+        <div class="small">SKU: ${p.supplier_sku || ''}</div>
         <div class="price">
-  ${currentCurrency === "USD"
-    ? `$${p.price_usd.toFixed(2)}`
-    : p.price_ngn.toLocaleString("en-NG", { style: "currency", currency: "NGN" })}
-</div>
+          ${currentCurrency === "USD"
+            ? `$${p.price_usd.toFixed(2)}`
+            : p.price_ngn.toLocaleString("en-NG", { style: "currency", currency: "NGN" })}
+        </div>
+        <div class="actions">
+          <div class="qty-wrapper">
+            <label>Qty:</label>
+            <input type="number" min="1" value="1" class="qty-input">
+          </div>
+          <div class="btns">
+            <button class="cart-btn add-btn" data-id="${p.id}">Add to Cart</button>
+            <button class="cart-btn buy buy-btn" data-id="${p.id}">Buy Now</button>
+          </div>
+        </div>
+      `;
 
+      if (i % 2 === 0) {
+        row1.appendChild(card); // even index → row 1
+      } else {
+        row2.appendChild(card); // odd index → row 2
+      }
+    });
 
-          <div class="actions">
-            <div class="qty-wrapper">
-              <label>Qty:</label>
-              <input type="number" min="1" value="1" class="qty-input">
-            </div>
-            <div class="btns">
-              <button class="cart-btn add-btn" data-id="${p.id}">Add to Cart</button>
-              <button class="cart-btn buy buy-btn" data-id="${p.id}">Buy Now</button>
-            </div>
-          </div>`;
-        productsGrid.appendChild(card);
-      });
+    // Add to Cart
+    document.querySelectorAll('.add-btn').forEach(btn => {
+      btn.onclick = () => {
+        const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
+        const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1;
+        const ex = cart.find(c => c.id == prod.id);
+        if (ex) ex.quantity += qty;
+        else cart.push({
+          id: prod.id,
+          title: prod.title,
+          price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
+          currency: currentCurrency,
+          quantity: qty
+        });
+        saveCart();
+      };
+    });
 
-      // Add to Cart
-      productsGrid.querySelectorAll('.add-btn').forEach(btn=>btn.onclick=()=>{
-        const prod = PRODUCTS.find(x=>x.id==btn.dataset.id);
-        const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value)||1;
-        const ex = cart.find(c=>c.id==prod.id);
-        if(ex) ex.quantity+=qty;
-      else cart.push({
-  id: prod.id,
-  title: prod.title,
-  price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
-  currency: currentCurrency,
-  quantity: qty
-});
+    // Buy Now
+    document.querySelectorAll('.buy-btn').forEach(btn => {
+      btn.onclick = () => {
+        const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
+        const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1;
+
+        cart = [{
+          id: prod.id,
+          title: prod.title,
+          price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
+          currency: currentCurrency,
+          quantity: qty
+        }];
 
         saveCart();
-      });
-
-// Buy Now
-productsGrid.querySelectorAll('.buy-btn').forEach(btn => btn.onclick = () => {
-  const prod = PRODUCTS.find(x => x.id == btn.dataset.id);
-  const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value) || 1;
-
-  cart = [{
-    id: prod.id,
-    title: prod.title,
-    price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
-    currency: currentCurrency,
-    quantity: qty
-  }];
-
-  saveCart();
-  window.location.href = "/checkout.html";
-});
-    }
+        window.location.href = "/checkout.html";
+      };
+    });
   }
+}
+
+// ===== Slider Arrows =====
+document.querySelector('.slider-arrow.left').addEventListener('click', () => {
+  document.querySelectorAll('.row-slider').forEach(row => {
+    row.scrollBy({ left: -250, behavior: 'smooth' });
+  });
+});
+
+document.querySelector('.slider-arrow.right').addEventListener('click', () => {
+  document.querySelectorAll('.row-slider').forEach(row => {
+    row.scrollBy({ left: 250, behavior: 'smooth' });
+  });
+});
+
   // ===== Orders =====
   async function loadOrders(){
     const res = await fetch(`${API}/orders`); const data = await res.json();
