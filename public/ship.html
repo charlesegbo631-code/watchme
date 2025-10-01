@@ -380,7 +380,7 @@ document.getElementById('whatsappBtn').addEventListener('click', () => {
   function updateCartSummary(){ cartCount.textContent = cart.reduce((sum,i)=>sum+i.quantity,0); }
 
 // ===== Load Products =====
-a// ===== Load Products =====
+// ===== Load Products =====
 async function loadProducts() {
   const res = await fetch(`${API}/products`); 
   const data = await res.json();
