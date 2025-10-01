@@ -87,23 +87,51 @@ h2 { font-size:22px; margin:16px 0; font-weight:600; color:#111; }
 .slider-arrow.left { left:8px; }
 .slider-arrow.right { right:8px; }
 
-@media (max-width:600px) {
-  .grid {
-    display: grid;
-    grid-template-rows: repeat(2, auto);  /* 2 rows */
-    grid-auto-flow: column;               /* lay out by column */
-    grid-auto-columns: 100%;              /* 1 column wide per page */
-    overflow-x: auto;                     /* swipe left/right */
+/* Desktop grid default */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.rows-wrapper { display: none; }
+
+/* Mobile rows */
+@media (max-width: 600px) {
+  .grid { display: none; } /* hide desktop grid */
+  .rows-wrapper { display: flex; flex-direction: column; gap: 20px; }
+
+  .row-container {
+    position: relative;
+  }
+
+  .row-slider {
+    overflow-x: auto;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
+    display: flex;
     gap: 16px;
     padding: 0 40px;
   }
 
-  .grid .card {
+  .grid-row .card {
+    flex: 0 0 70%;
     scroll-snap-align: start;
   }
+
+  .slider-arrow {
+    position: absolute; top: 40%; transform: translateY(-50%);
+    background: rgba(0,0,0,0.5); color:#fff;
+    border: none; border-radius: 50%;
+    width: 36px; height: 36px;
+    font-size: 18px; cursor: pointer;
+    z-index: 10;
+  }
+  .slider-arrow.left { left: 8px; }
+  .slider-arrow.right { right: 8px; }
 }
+
+
 
 /* ===== Admin Panel ===== */
 .admin-panel {
@@ -218,10 +246,22 @@ label input {
     </div>
   </div>
 
-  <h2>Products</h2>
-  <div class="slider-wrapper">
+<h2>Products</h2>
+
+<!-- Desktop grid -->
+<div id="productsGrid" class="grid"></div>
+
+<!-- Mobile two-row sliders -->
+<div class="rows-wrapper">
+  <div class="row-container">
     <button class="slider-arrow left">‹</button>
-    <div id="productsGrid" class="grid"></div>
+    <div class="row-slider"><div class="grid-row" id="row1"></div></div>
+    <button class="slider-arrow right">›</button>
+  </div>
+
+  <div class="row-container">
+    <button class="slider-arrow left">‹</button>
+    <div class="row-slider"><div class="grid-row" id="row2"></div></div>
     <button class="slider-arrow right">›</button>
   </div>
 </div>
@@ -368,40 +408,45 @@ document.getElementById('whatsappBtn').addEventListener('click', () => {
   function saveCart(){ localStorage.setItem('ds_cart', JSON.stringify(cart)); updateCartSummary(); }
   function updateCartSummary(){ cartCount.textContent = cart.reduce((sum,i)=>sum+i.quantity,0); }
 
-  // ===== Load Products =====
-  async function loadProducts(){
-    const res = await fetch(`${API}/products`); 
-    const data = await res.json();
-    if(data.success){ 
-      PRODUCTS = data.products; 
-      productsGrid.innerHTML='';
-      
-      PRODUCTS.forEach(p=>{
-        const card = document.createElement('div'); 
-        card.className='card';
-        card.innerHTML = `
-          <img src="${p.img}">
-          <h4>${p.title}</h4>
-          <div class="small">SKU: ${p.supplier_sku||''}</div>
-        <div class="price">
-  ${currentCurrency === "USD"
-    ? `$${p.price_usd.toFixed(2)}`
-    : p.price_ngn.toLocaleString("en-NG", { style: "currency", currency: "NGN" })}
-</div>
+async function loadProducts() {
+  const res = await fetch(`${API}/products`);
+  const data = await res.json();
+  if (!data.success) return;
 
+  PRODUCTS = data.products;
 
-          <div class="actions">
-            <div class="qty-wrapper">
-              <label>Qty:</label>
-              <input type="number" min="1" value="1" class="qty-input">
-            </div>
-            <div class="btns">
-              <button class="cart-btn add-btn" data-id="${p.id}">Add to Cart</button>
-              <button class="cart-btn buy buy-btn" data-id="${p.id}">Buy Now</button>
-            </div>
-          </div>`;
-        productsGrid.appendChild(card);
-      });
+  // desktop
+  const productsGrid = document.getElementById("productsGrid");
+  productsGrid.innerHTML = "";
+
+  // mobile rows
+  const row1 = document.getElementById("row1");
+  const row2 = document.getElementById("row2");
+  row1.innerHTML = "";
+  row2.innerHTML = "";
+
+  PRODUCTS.forEach((p, i) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img src="${p.img}">
+      <h4>${p.title}</h4>
+      <div class="small">SKU: ${p.supplier_sku || ""}</div>
+      <div class="price">$${p.price_usd.toFixed(2)}</div>
+      <div class="actions">
+        <div class="qty-wrapper">
+          <label>Qty:</label>
+          <input type="number" min="1" value="1" class="qty-input">
+        </div>
+        <div class="btns">
+          <button class="cart-btn add-btn" data-id="${p.id}">Add to Cart</button>
+          <button class="cart-btn buy buy-btn" data-id="${p.id}">Buy Now</button>
+        </div>
+      </div>`;
+
+    productsGrid.appendChild(card); // desktop
+    (i % 2 === 0 ? row1 : row2).appendChild(card.cloneNode(true)); // mobile
+  });
 
       // Add to Cart
       productsGrid.querySelectorAll('.add-btn').forEach(btn=>btn.onclick=()=>{
