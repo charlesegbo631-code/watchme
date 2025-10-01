@@ -237,21 +237,26 @@ async function createPaystackOrderHandler(req, res) {
       usdSupplierTotal += cost * qty;
     }
 
-    // --- Convert to NGN (kobo)
-    const usdToNgn = await fetchUsdToNgnRate();
-    const totalUsd = fromCents(usdTotal);
-    const totalNaira = totalUsd * usdToNgn;
-    const totalKobo = Math.round(totalNaira * 100);
+    
+  // 1. Get live USD → NGN rate
+const usdToNgn = await fetchUsdToNgnRate();
 
-    // --- Build payload
-    const url = "https://api.paystack.co/transaction/initialize";
-    const payload = {
-      email: customer?.email || "guest@example.com",
-      amount: totalKobo,
-      currency: "NGN",
-      callback_url: process.env.PAYSTACK_CALLBACK_URL || "http://localhost:3000/api/paystack-callback",
-      metadata: { cartItems, customer }
-    };
+// 2. Convert the cart total from USD → NGN
+const totalUsd = fromCents(usdTotal);
+const totalNaira = totalUsd * usdToNgn;
+
+// 3. Paystack needs kobo (₦ × 100)
+const totalKobo = Math.round(totalNaira * 100);
+
+// 4. Build Paystack payload
+const payload = {
+  email: customer?.email || "guest@example.com",
+  amount: totalKobo,   // ✅ now correct in kobo
+  currency: "NGN",     // ✅ Paystack knows it's naira
+  metadata: { cartItems, customer }
+};
+const url = "https://api.paystack.co/transaction/initialize";
+
     const headers = {
       Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
       "Content-Type": "application/json"
