@@ -380,6 +380,7 @@ document.getElementById('whatsappBtn').addEventListener('click', () => {
   function updateCartSummary(){ cartCount.textContent = cart.reduce((sum,i)=>sum+i.quantity,0); }
 
 // ===== Load Products =====
+a// ===== Load Products =====
 async function loadProducts() {
   const res = await fetch(`${API}/products`); 
   const data = await res.json();
@@ -389,6 +390,8 @@ async function loadProducts() {
     const row2 = document.getElementById('row2');
     row1.innerHTML = '';
     row2.innerHTML = '';
+
+    const isMobile = window.innerWidth <= 600;
 
     PRODUCTS.forEach((p, i) => {
       const card = document.createElement('div');
@@ -414,10 +417,13 @@ async function loadProducts() {
         </div>
       `;
 
-      if (i % 2 === 0) {
-        row1.appendChild(card); // even index → row 1
+      if (isMobile) {
+        // Mobile → split into two scrollable rows
+        if (i % 2 === 0) row1.appendChild(card);
+        else row2.appendChild(card);
       } else {
-        row2.appendChild(card); // odd index → row 2
+        // Desktop → put everything in row1 only (grid mode)
+        row1.appendChild(card);
       }
     });
 
@@ -460,18 +466,6 @@ async function loadProducts() {
   }
 }
 
-// ===== Slider Arrows =====
-document.querySelector('.slider-arrow.left').addEventListener('click', () => {
-  document.querySelectorAll('.row-slider').forEach(row => {
-    row.scrollBy({ left: -250, behavior: 'smooth' });
-  });
-});
-
-document.querySelector('.slider-arrow.right').addEventListener('click', () => {
-  document.querySelectorAll('.row-slider').forEach(row => {
-    row.scrollBy({ left: 250, behavior: 'smooth' });
-  });
-});
 
   // ===== Orders =====
   async function loadOrders(){
