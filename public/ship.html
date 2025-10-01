@@ -89,17 +89,22 @@ h2 { font-size:22px; margin:16px 0; font-weight:600; color:#111; }
 
 @media (max-width:600px) {
   .grid {
-    display:grid;
-    grid-auto-flow:column;
-    grid-auto-columns:calc(50% - 12px);
-    overflow-x:auto;
-    scroll-snap-type:x mandatory;
-    -webkit-overflow-scrolling:touch;
-    gap:16px;
-    padding:0 40px;
+    display: grid;
+    grid-template-rows: repeat(2, auto);  /* 2 rows */
+    grid-auto-flow: column;               /* lay out by column */
+    grid-auto-columns: 100%;              /* 1 column wide per page */
+    overflow-x: auto;                     /* swipe left/right */
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 16px;
+    padding: 0 40px;
   }
-  .grid .card { scroll-snap-align:start; }
+
+  .grid .card {
+    scroll-snap-align: start;
+  }
 }
+
 
 /* ===== Admin Panel ===== */
 .admin-panel {
