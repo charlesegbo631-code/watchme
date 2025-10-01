@@ -105,19 +105,22 @@ h2 { font-size:22px; margin:16px 0; font-weight:600; color:#111; }
     position: relative;
   }
 
-  .row-slider {
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-    display: flex;
-    gap: 16px;
-    padding: 0 40px;
-  }
+.row-slider {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
 
-  .grid-row .card {
-    flex: 0 0 70%;
-    scroll-snap-align: start;
-  }
+.grid-row {
+  display: flex;
+  gap: 16px;
+  padding: 0 40px;
+}
+
+.grid-row .card {
+  flex: 0 0 70%;   /* each card takes 70% of viewport */
+  scroll-snap-align: start;
+}
 
   .slider-arrow {
     position: absolute; top: 40%; transform: translateY(-50%);
