@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Checkout - Charlie's Dropship</title>
+  <style>
+    body{font-family:Arial;background:#f3f4f6;margin:0;padding:20px;}
+    .card{background:#fff;padding:16px;border-radius:12px;max-width:500px;margin:auto;box-shadow:0 2px 8px rgba(0,0,0,0.05);}
+    .cart-item{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:8px 0;}
+    .cart-btn{background:#0ea5a4;color:#fff;padding:10px 16px;border:none;border-radius:8px;cursor:pointer;margin-top:10px;}
+    .remove-btn{background:#ef4444;color:#fff;padding:4px 8px;border:none;border-radius:6px;cursor:pointer;}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Checkout</h2>
+    <div id="cartList"></div>
+    <div style="display:flex;justify-content:space-between;font-weight:bold;margin-top:10px">
+      <span>Total</span><span id="cartTotal">$0.00</span>
+    </div>
+
+    <h3>Your Details</h3>
+    <input id="custName" placeholder="Full Name"><br>
+    <input id="custEmail" type="email" placeholder="Email"><br>
+    <input id="custPhone" placeholder="Phone"><br>
+    <textarea id="custAddress" placeholder="Shipping Address"></textarea><br>
+
+    <button id="checkoutPaystack" class="cart-btn">Pay with Paystack</button>
+    <button id="checkoutOpay" class="cart-btn" style="background:#0045BA"></button>
+  </div>
+
+<script>
+const API='/api';
+let cart = JSON.parse(localStorage.getItem('ds_cart')||'[]');
+
+const cartList=document.getElementById('cartList');
+const cartTotal=document.getElementById('cartTotal');
+
+function renderCart(){
+  cartList.innerHTML=''; let total=0;
+  cart.forEach((i,idx)=>{
+    total+=i.price*i.quantity;
+    const row=document.createElement('div'); row.className='cart-item';
+    row.innerHTML=`<div>${i.title} x${i.quantity}</div><div>$${(i.price*i.quantity).toFixed(2)} <button class="remove-btn" onclick="removeItem(${idx})">x</button></div>`;
+    cartList.appendChild(row);
+  });
+  cartTotal.textContent=`$${total.toFixed(2)}`;
+}
+function removeItem(idx){ cart.splice(idx,1); localStorage.setItem('ds_cart',JSON.stringify(cart)); renderCart(); }
+renderCart();
+
+// Paystack
+document.getElementById('checkoutPaystack').onclick=async()=>{
+  if(cart.length===0){alert("Cart is empty");return;}
+  const customer={name:custName.value,email:custEmail.value,phone:custPhone.value,address:custAddress.value};
+  const res=await fetch(`${API}/create-paystack-order`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cartItems:cart,customer})});
+  const data=await res.json();
+  if(data.success&&data.authorizationUrl) window.location.href=data.authorizationUrl;
+  else alert("Paystack error "+data.error);
+};
+
+// OPay
+document.getElementById('checkoutOpay').onclick=async()=>{
+  if(cart.length===0){alert("Cart is empty");return;}
+  const customer={name:custName.value,email:custEmail.value,phone:custPhone.value,address:custAddress.value};
+  const res=await fetch(`${API}/create-opay-session`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cartItems:cart,customer})});
+  const data=await res.json();
+  const payUrl=data?.data?.data?.link||data?.data?.data?.cashierUrl;
+  if(payUrl) window.location.href=payUrl;
+  else alert("OPay error "+data.error);
+};
+</script>
+</body>
+</html>

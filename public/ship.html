@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Charlie's Dropship Store</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+<style>
+:root {
+  --accent:#0ea5a4;
+  --danger:#ef4444;
+  --muted:#6b7280;
+  --bg:#f9fafb;
+  --card:#ffffff;
+  --border:#e5e7eb;
+}
+body {
+  font-family: "Inter", system-ui, Arial, sans-serif;
+  margin:0;
+  background:var(--bg);
+  color:#111;
+  line-height:1.5;
+}
+header {
+  background:var(--card);
+  padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;
+  top:0;
+  z-index:100;
+}
+.brand {
+  font-weight:700;
+  font-size:18px;
+  color:var(--accent);
+}
+header .cart-summary {
+  font-weight:500;
+}
+.main {
+  max-width:1100px;
+  margin:20px auto;
+  padding:0 16px;
+}
+h2 {
+  font-size:22px;
+  margin:16px 0;
+  font-weight:600;
+  color:#111;
+}
+.grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  gap:20px;
+}
+.card {
+  background:var(--card);
+  padding:14px;
+  border-radius:14px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.04);
+  transition:transform .15s ease, box-shadow .15s ease;
+  display:flex;
+  flex-direction:column;
+}
+.card:hover {
+  transform:translateY(-3px);
+  box-shadow:0 8px 20px rgba(0,0,0,0.08);
+}
+.card img {
+  width:100%;
+  height:180px;
+  object-fit:cover;
+  border-radius:10px;
+}
+.card h4 {
+  margin:12px 0 6px;
+  font-size:16px;
+  font-weight:600;
+}
+.small {
+  font-size:13px;
+  color:var(--muted);
+}
+.price {
+  font-weight:700;
+  margin-top:8px;
+  font-size:15px;
+}
+.actions {
+  margin-top:10px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.qty-wrapper {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:14px;
+  color:var(--muted);
+}
+.qty-input {
+  width:65px;
+  padding:6px 8px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  font-size:14px;
+  text-align:center;
+}
+.btns {
+  display:flex;
+  gap:8px;
+}
+.cart-btn {
+  flex:1;
+  background:var(--accent);
+  color:#fff;
+  border:0;
+  padding:8px 12px;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:14px;
+  font-weight:500;
+  transition:background .2s ease, transform .1s ease;
+}
+.cart-btn:hover { opacity:0.9; transform:translateY(-1px); }
+.cart-btn.buy { background:var(--danger); }
+
+/* ===== Admin Panel ===== */
+.admin-panel {
+  background:var(--card);
+  padding:16px;
+  margin-bottom:20px;
+  border-radius:14px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.05);
+  display:none;
+}
+.admin-panel h3 {
+  margin-top:0;
+  font-size:18px;
+  font-weight:600;
+}
+.admin-tabs {
+  display:flex;
+  gap:10px;
+  margin-bottom:16px;
+}
+.admin-tabs button {
+  padding:6px 12px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--bg);
+  cursor:pointer;
+  font-size:14px;
+  transition:all .2s ease;
+}
+.admin-tabs button.active {
+  background:var(--accent);
+  color:#fff;
+  border-color:var(--accent);
+}
+#ordersTable,#productsTable {
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+#ordersTable th,#ordersTable td,
+#productsTable th,#productsTable td {
+  border:1px solid var(--border);
+  padding:6px 8px;
+  text-align:left;
+}
+#ordersTable th,#productsTable th {
+  background:#f3f4f6;
+  font-weight:600;
+}
+#adminAccessBtn {
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  padding:12px;
+  border-radius:50%;
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  cursor:pointer;
+  z-index:999;
+  font-size:18px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.2);
+  transition:background .2s ease, transform .1s ease;
+}
+#adminAccessBtn:hover { opacity:.9; transform:scale(1.05); }
+label {
+  display:block;
+  margin:6px 0;
+  font-size:14px;
+  font-weight:500;
+}
+label input {
+  margin-top:4px;
+  width:100%;
+  padding:6px 8px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  font-size:14px;
+}
+#addProductBtn,#downloadCSV {
+  margin-top:10px;
+  padding:8px 12px;
+  border-radius:8px;
+  font-size:14px;
+  cursor:pointer;
+}
+#whatsappBtn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #25D366;
+  color: #fff;
+  border: none;
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#whatsappBtn:hover { opacity:.9; transform:scale(1.05); }
+
+#whatsappBtn:hover {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+#addProductBtn { background:var(--accent); color:#fff; border:none; }
+#downloadCSV { background:var(--accent); color:#fff; border:none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Charlie's Store</div>
+  <div class="cart-summary">🛒 Cart (<span id="cartCount">0</span>)</div>
+    <button id="toggleCurrency">Switch Currency</button>
+
+</header>
+
+<button id="adminAccessBtn" title="Admin Panel">⚙️</button>
+<button id="whatsappBtn" title="Chat with Dealer">💬</button>
+<div class="main">
+  <!-- Admin Panel -->
+  <div class="admin-panel" id="adminPanelWrapper">
+    <div class="admin-tabs">
+      <button id="tabAddProduct" class="active">Add Product</button>
+      <button id="tabManage">Manage Products</button>
+      <button id="tabOrders">Orders</button>
+    </div>
+
+    <!-- Add Product -->
+    <div id="addProductSection">
+      <h3>Add Product</h3>
+      <label>Title <input id="adminTitle"></label>
+      <label>Price ($) <input id="adminPrice" type="number" step="0.01"></label>
+      <label>Supplier Cost ($) <input id="adminCost" type="number" step="0.01"></label>
+      <label>SKU <input id="adminSKU"></label>
+      <label>Image URL <input id="adminImg"></label>
+      <button id="addProductBtn">Add Product</button>
+      <div id="adminStatus"></div>
+    </div>
+
+    <!-- Manage Products -->
+    <div id="manageProductsSection" style="display:none">
+      <h3>Manage Products</h3>
+      <div style="overflow:auto;max-height:400px">
+        <table id="productsTable">
+          <thead>
+            <tr><th>Title</th><th>Price</th><th>SKU</th><th>Actions</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Orders -->
+    <div id="ordersSection" style="display:none">
+      <h3>Customer Orders</h3>
+      <button id="downloadCSV">Download CSV</button>
+      <div style="overflow:auto;max-height:400px;margin-top:10px">
+        <table id="ordersTable">
+          <thead>
+            <tr>
+              <th>Name</th><th>Email</th><th>Phone</th><th>Address</th>
+              <th>Items</th><th>Total</th><th>Provider</th><th>Status</th><th>Date</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h2>Products</h2>
+  <div id="productsGrid" class="grid"></div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const ADMIN_PIN_HASH = "4d928d91f8095708c95d2e05750a142dc849c84d0897bb9f07605e83a156232f"; 
+const API = '/api';
+let PRODUCTS = [], cart = JSON.parse(localStorage.getItem('ds_cart') || '[]');
+let currentCurrency = "NGN"; // default
+let rates = { USD: 1, NGN: 1500 }; // fallback, will be updated
+
+async function loadRates() {
+  try {
+    const res = await fetch("/api/rates");
+    const data = await res.json();
+    if (data.success) rates = data.rates;
+  } catch (e) {
+    console.warn("⚠️ Could not load live rates, using fallback.");
+  }
+}
+
+function convertPrice(usd, currency = currentCurrency) {
+  return (usd * (rates[currency] || 1)).toFixed(2);
+}
+
+// ===== HASH FUNCTION =====
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+(async function(){
+  const productsGrid = document.getElementById('productsGrid');
+  const cartCount = document.getElementById('cartCount');
+  const adminPanel = document.getElementById('adminPanelWrapper');
+  const tabAdd = document.getElementById('tabAddProduct');
+  const tabManage = document.getElementById('tabManage');
+  const tabOrders = document.getElementById('tabOrders');
+  const addProductSection = document.getElementById('addProductSection');
+  const manageProductsSection = document.getElementById('manageProductsSection');
+  const ordersSection = document.getElementById('ordersSection');
+  const adminStatus = document.getElementById('adminStatus');
+  const ordersTableBody = document.querySelector('#ordersTable tbody');
+  const productsTableBody = document.querySelector('#productsTable tbody');
+
+  // ===== ADMIN ACCESS =====
+  document.getElementById('adminAccessBtn').addEventListener('click', async () => {
+    const pin = prompt("Enter Admin PIN:");
+    if (!pin) return;
+    const enteredHash = await sha256(pin);
+    if (enteredHash === ADMIN_PIN_HASH) {
+      adminPanel.style.display = 'block';
+      loadOrders();
+      loadProductsForAdmin();
+    } else {
+      alert("❌ Wrong PIN");
+    }
+  });
+// WhatsApp Button
+document.getElementById('whatsappBtn').addEventListener('click', () => {
+  const phone = "2348165881012"; // Nigeria format: replace leading 0 with 234
+  const url = `https://wa.me/${phone}?text=Hello! I'm interested in your products.`;
+  window.open(url, "_blank");
+});
+
+  // ===== Tabs =====
+  function showTab(tab){
+    addProductSection.style.display = (tab==='add')?'block':'none';
+    manageProductsSection.style.display = (tab==='manage')?'block':'none';
+    ordersSection.style.display = (tab==='orders')?'block':'none';
+    tabAdd.classList.toggle('active', tab==='add');
+    tabManage.classList.toggle('active', tab==='manage');
+    tabOrders.classList.toggle('active', tab==='orders');
+  }
+  tabAdd.onclick = ()=>showTab('add');
+  tabManage.onclick = ()=>{ showTab('manage'); loadProductsForAdmin(); };
+  tabOrders.onclick = ()=>{ showTab('orders'); loadOrders(); };
+
+  // ===== Add Product =====
+  document.getElementById('addProductBtn').addEventListener('click', async ()=>{
+    const title = adminTitle.value.trim();
+    const price = parseFloat(adminPrice.value);
+    const supplierCost = parseFloat(adminCost.value);
+    const sku = adminSKU.value.trim();
+    const img = adminImg.value.trim();
+
+    if(!title || isNaN(price) || isNaN(supplierCost) || !img){
+      adminStatus.textContent="⚠️ Missing fields";
+      adminStatus.style.color="red"; return;
+    }
+
+    const res = await fetch(`${API}/add-product`,{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({title,price,supplierCost,supplier_sku: sku,img})
+    });
+    const data = await res.json();
+    if(data.success){ 
+      adminStatus.textContent="✅ Added"; 
+      adminStatus.style.color="green"; 
+      loadProducts(); 
+      loadProductsForAdmin(); 
+    } else { 
+      adminStatus.textContent="❌ Error "+data.error; 
+      adminStatus.style.color="red"; 
+    }
+  });
+
+  // ===== Delete Product =====
+  async function deleteProduct(id){
+    if(!confirm("Delete this product?")) return;
+    const res = await fetch(`${API}/delete-product/${id}`,{method:"DELETE"});
+    const data = await res.json();
+    if(data.success){ loadProductsForAdmin(); loadProducts(); }
+    else alert("Delete failed: "+data.error);
+  }
+  window.deleteProduct = deleteProduct;
+
+  // ===== Render Admin Products =====
+  async function loadProductsForAdmin(){
+    const res = await fetch(`${API}/products`); const data = await res.json();
+    if(data.success){
+      productsTableBody.innerHTML='';
+      data.products.forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.title}</td>
+      <td>
+  ${currentCurrency === "USD"
+    ? `$${p.price_usd.toFixed(2)}`
+    : p.price_ngn.toLocaleString("en-NG", { style: "currency", currency: "NGN" })}
+</td>
+
+
+          <td>${p.supplier_sku||''}</td>
+          <td><button onclick="deleteProduct('${p.id}')" style="background:var(--danger);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer">Delete</button></td>`;
+        productsTableBody.appendChild(tr);
+      });
+    }
+  }
+
+  // ===== Cart =====
+  function saveCart(){ localStorage.setItem('ds_cart', JSON.stringify(cart)); updateCartSummary(); }
+  function updateCartSummary(){ cartCount.textContent = cart.reduce((sum,i)=>sum+i.quantity,0); }
+
+  // ===== Load Products =====
+  async function loadProducts(){
+    const res = await fetch(`${API}/products`); 
+    const data = await res.json();
+    if(data.success){ 
+      PRODUCTS = data.products; 
+      productsGrid.innerHTML='';
+      
+      PRODUCTS.forEach(p=>{
+        const card = document.createElement('div'); 
+        card.className='card';
+        card.innerHTML = `
+          <img src="${p.img}">
+          <h4>${p.title}</h4>
+          <div class="small">SKU: ${p.supplier_sku||''}</div>
+        <div class="price">
+  ${currentCurrency === "USD"
+    ? `$${p.price_usd.toFixed(2)}`
+    : p.price_ngn.toLocaleString("en-NG", { style: "currency", currency: "NGN" })}
+</div>
+
+
+          <div class="actions">
+            <div class="qty-wrapper">
+              <label>Qty:</label>
+              <input type="number" min="1" value="1" class="qty-input">
+            </div>
+            <div class="btns">
+              <button class="cart-btn add-btn" data-id="${p.id}">Add to Cart</button>
+              <button class="cart-btn buy buy-btn" data-id="${p.id}">Buy Now</button>
+            </div>
+          </div>`;
+        productsGrid.appendChild(card);
+      });
+
+      // Add to Cart
+      productsGrid.querySelectorAll('.add-btn').forEach(btn=>btn.onclick=()=>{
+        const prod = PRODUCTS.find(x=>x.id==btn.dataset.id);
+        const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value)||1;
+        const ex = cart.find(c=>c.id==prod.id);
+        if(ex) ex.quantity+=qty;
+      else cart.push({
+  id: prod.id,
+  title: prod.title,
+  price: currentCurrency === "USD" ? prod.price_usd : prod.price_ngn,
+  currency: currentCurrency,
+  quantity: qty
+});
+
+        saveCart();
+      });
+
+      // Buy Now
+      productsGrid.querySelectorAll('.buy-btn').forEach(btn=>btn.onclick=()=>{
+        const prod = PRODUCTS.find(x=>x.id==btn.dataset.id);
+        const qty = parseInt(btn.closest('.actions').querySelector('.qty-input').value)||1;
+        cart = [{id:prod.id,title:prod.title,price:parseFloat(prod.price)||0,quantity:qty}];
+        saveCart();
+        window.location.href="/checkout.html";
+      });
+    }
+  }
+
+  // ===== Orders =====
+  async function loadOrders(){
+    const res = await fetch(`${API}/orders`); const data = await res.json();
+    if(data.success){ 
+      ordersTableBody.innerHTML='';
+      data.orders.forEach(o=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${o.customer_name||''}</td>
+          <td>${o.customer_email||''}</td>
+          <td>${o.customer_phone||''}</td>
+          <td>${o.customer_address||''}</td>
+          <td>${o.items}</td>
+        <td>
+  ${currentCurrency === "USD"
+    ? `$${o.total_usd.toFixed(2)}`
+    : o.total_ngn.toLocaleString("en-NG", { style: "currency", currency: "NGN" })}
+</td>
+
+
+          <td>${o.provider}</td>
+          <td>${o.status}</td>
+          <td>${o.created_at}</td>`;
+        ordersTableBody.appendChild(tr);
+      });
+    }
+  }
+document.getElementById("toggleCurrency").addEventListener("click", () => {
+  currentCurrency = currentCurrency === "USD" ? "NGN" : "USD";
+  loadProducts();
+  loadProductsForAdmin();
+  loadOrders();
+});
+
+  // Download CSV
+  document.getElementById('downloadCSV').onclick=()=>{
+    let csv="Name,Email,Phone,Address,Items,Total,Provider,Status,Date\n";
+    document.querySelectorAll('#ordersTable tbody tr').forEach(r=>{
+      csv += [...r.children].map(td=>`"${td.innerText}"`).join(",")+"\n";
+    });
+    const blob = new Blob([csv],{type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url;a.download="orders.csv";a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Init
+(async () => {
+  await loadRates();   // get live USD → NGN
+  await loadProducts();
+  await loadProductsForAdmin();
+  await loadOrders();
+  updateCartSummary();
+})();
+
+})();
+</script>
+</body>
+</html>
