@@ -32,6 +32,8 @@ let db;
     filename: path.join(__dirname, "dropship.db"),
     driver: sqlite3.Database,
   });
+
+  // Create orders table including customer_phone & customer_address for fresh installs
   await db.exec(`
     CREATE TABLE IF NOT EXISTS orders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,6 +42,8 @@ let db;
       status TEXT,
       customer_name TEXT,
       customer_email TEXT,
+      customer_phone TEXT,
+      customer_address TEXT,
       items_json TEXT,
       total_cents_usd INTEGER,
       total_kobo_ngn INTEGER,
@@ -50,6 +54,20 @@ let db;
       processed_at TEXT
     )
   `);
+
+  // If upgrading from older DB, attempt to add missing columns (safe-ish: catch errors)
+  try {
+    await db.exec(`ALTER TABLE orders ADD COLUMN customer_phone TEXT`);
+  } catch (e) {
+    // ignore if column exists
+  }
+  try {
+    await db.exec(`ALTER TABLE orders ADD COLUMN customer_address TEXT`);
+  } catch (e) {
+    // ignore if column exists
+  }
+
+  // Products table
   await db.exec(`
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
@@ -60,6 +78,7 @@ let db;
       img TEXT
     )
   `);
+
   console.log("📦 DB ready");
 })();
 
@@ -93,7 +112,9 @@ async function fetchUsdToNgnRate() {
   return rate;
 }
 
-
+/**
+ * Create a draft order in DB. Accepts customer with name/email/phone/address.
+ */
 async function createDraftOrder({
   paymentId,
   cartItems,
@@ -106,19 +127,21 @@ async function createDraftOrder({
   const local_order_id = "o" + Date.now();
   await db.run(
     `INSERT OR IGNORE INTO orders
-     (local_order_id, payment_id, status, customer_name, customer_email, items_json,
+     (local_order_id, payment_id, status, customer_name, customer_email, customer_phone, customer_address, items_json,
       total_cents_usd, total_kobo_ngn, supplier_share_cents, profit_cents)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     local_order_id,
     paymentId,
     "pending",
     customer?.name || "",
     customer?.email || "",
+    customer?.phone || "",
+    customer?.address || "",
     JSON.stringify(cartItems || []),
-    usdTotalCents,
-    koboTotal,
-    supplierTotal,
-    profitCents
+    usdTotalCents ?? 0,
+    koboTotal ?? 0,
+    supplierTotal ?? 0,
+    profitCents ?? 0
   );
   return local_order_id;
 }
@@ -147,11 +170,38 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-
 app.get("/api/orders", async (req, res) => {
   try {
     const rows = await db.all("SELECT * FROM orders ORDER BY created_at DESC");
-    res.json({ success: true, orders: rows });
+    // map DB rows into a nicer shape for frontend
+    const orders = rows.map((r) => {
+      let items = [];
+      try {
+        items = JSON.parse(r.items_json || "[]");
+      } catch (e) {
+        items = [];
+      }
+      return {
+        id: r.id,
+        local_order_id: r.local_order_id,
+        payment_id: r.payment_id,
+        status: r.status,
+        customer_name: r.customer_name,
+        customer_email: r.customer_email,
+        customer_phone: r.customer_phone,
+        customer_address: r.customer_address,
+        items: items, // array of items
+        // numeric totals (frontend can format)
+        total_usd: r.total_cents_usd ? (r.total_cents_usd / 100) : 0,
+        total_ngn: r.total_kobo_ngn ? (r.total_kobo_ngn / 100) : 0,
+        supplier_share_usd: r.supplier_share_cents ? (r.supplier_share_cents / 100) : 0,
+        profit_usd: r.profit_cents ? (r.profit_cents / 100) : 0,
+        supplier_response: r.supplier_response,
+        created_at: r.created_at,
+        processed_at: r.processed_at,
+      };
+    });
+    res.json({ success: true, orders });
   } catch (err) {
     console.error("GET /api/orders error", err);
     res.json({ success: false, message: err.message });
@@ -202,6 +252,7 @@ app.delete("/api/delete-product/:id", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 app.get("/api/rates", async (req, res) => {
   try {
     const usdToNgn = await fetchUsdToNgnRate();
@@ -213,10 +264,7 @@ app.get("/api/rates", async (req, res) => {
 });
 
 // ---------- Paystack ----------
-// ✅ Create Paystack Order
-// ---------- Paystack ----------
-// ✅ Create Paystack Order (improved logging)
-// ✅ Create Paystack Order (no USD→NGN conversion)
+// ✅ Create Paystack Order (no USD→NGN conversion; assumes cart prices already NGN)
 async function createPaystackOrderHandler(req, res) {
   try {
     console.log("📥 Incoming /api/create-paystack-order body:", JSON.stringify(req.body, null, 2));
@@ -227,7 +275,7 @@ async function createPaystackOrderHandler(req, res) {
       return res.status(400).json({ success: false, message: "cartItems required" });
     }
 
-    // --- Calculate totals (already in NGN)
+    // --- Calculate totals (assume cartItems[].price is already in NGN)
     let ngnTotal = 0;
     for (const it of cartItems) {
       const price = Number(it.price) || 0; // assume price already NGN
@@ -255,14 +303,14 @@ async function createPaystackOrderHandler(req, res) {
 
     const response = await axios.post(url, payload, { headers, timeout: 20000 });
 
-    // Save draft order (using NGN values directly)
+    // Save draft order (store customer phone/address if provided)
     await createDraftOrder({
       paymentId: response.data.data.reference,
       cartItems,
       customer,
-      usdTotalCents: 0,        // not used anymore
+      usdTotalCents: 0,        // not used for NGN-based checkout
       koboTotal: totalKobo,
-      supplierTotal: 0,        // adjust if you need supplier share in NGN
+      supplierTotal: 0,        // adjust if you compute supplier share in NGN / kobo
       profitCents: 0           // adjust if needed
     });
 
@@ -279,7 +327,6 @@ async function createPaystackOrderHandler(req, res) {
     res.status(500).json({ success: false, error: err.message || "Paystack request failed" });
   }
 }
-
 
 app.post("/api/create-paystack-order", createPaystackOrderHandler);
 
@@ -332,11 +379,10 @@ async function verifyPaystackPayment(req, res) {
     }
     res.status(500).json({ success: false, error: err.message });
   }
-} // 👈 closes the function
+}
 
 // now you can register it:
 app.get("/api/paystack-callback", verifyPaystackPayment);
-
 
 // ---------- OPay ----------
 async function createOpayOrderHandler(req, res) {
@@ -347,10 +393,13 @@ async function createOpayOrderHandler(req, res) {
     }
 
     let usdTotal = 0;
+    let usdSupplierTotal = 0;
     for (const it of cartItems) {
-      const price = toCents(it.price);
+      const price = toCents(it.price); // price in USD cents
+      const cost = toCents(it.supplierCost || 0);
       const qty = parseInt(it.quantity || 1, 10);
       usdTotal += price * qty;
+      usdSupplierTotal += cost * qty;
     }
 
     const usdToNgn = await fetchUsdToNgnRate();
@@ -393,8 +442,8 @@ async function createOpayOrderHandler(req, res) {
       customer,
       usdTotalCents: usdTotal,
       koboTotal: totalKobo,
-      supplierTotal: 0,
-      profitCents: 0,
+      supplierTotal: usdSupplierTotal,
+      profitCents: usdTotal - usdSupplierTotal,
     });
 
     res.json({ success: true, data: opayResp.data, reference, totalKobo, rate: usdToNgn });
