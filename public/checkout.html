@@ -21,8 +21,38 @@
     .cart-item {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       border-bottom: 1px solid #eee;
       padding: 8px 0;
+    }
+    .item-info { flex: 1; }
+    .qty-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .qty-btn {
+      background: #0ea5a4;
+      color: #fff;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .quantity {
+      min-width: 24px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .remove-btn {
+      background: #ef4444;
+      color: #fff;
+      padding: 4px 8px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
     }
     .cart-btn {
       background: #0ea5a4;
@@ -33,14 +63,6 @@
       cursor: pointer;
       margin-top: 10px;
       width: 100%;
-    }
-    .remove-btn {
-      background: #ef4444;
-      color: #fff;
-      padding: 4px 8px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
     }
     input, textarea {
       width: 100%;
@@ -70,7 +92,7 @@
 
     <!-- Payment Buttons -->
     <button id="checkoutPaystack" class="cart-btn">Pay with Paystack</button>
-    <button id="checkoutOpay" class="cart-btn" style="background:#0045BA"></button>
+    <button id="checkoutOpay" class="cart-btn" style="background:#0045BA">Pay with OPay</button>
   </div>
 
 <script>
@@ -87,6 +109,19 @@ function formatPrice(amount, currency) {
     : amount.toLocaleString("en-NG", { style: "currency", currency: "NGN" });
 }
 
+function saveCart() {
+  localStorage.setItem('ds_cart', JSON.stringify(cart));
+  renderCart();
+}
+
+function changeQuantity(idx, delta) {
+  cart[idx].quantity += delta;
+  if (cart[idx].quantity <= 0) {
+    cart.splice(idx, 1);
+  }
+  saveCart();
+}
+
 function renderCart() {
   cartList.innerHTML = '';
   let total = 0;
@@ -97,20 +132,22 @@ function renderCart() {
     const row = document.createElement('div');
     row.className = 'cart-item';
     row.innerHTML = `
-      <div>${item.title} × ${item.quantity}</div>
-      <div>${formatPrice(item.price * item.quantity, item.currency)} 
-        <button class="remove-btn" onclick="removeItem(${idx})">x</button>
+      <div class="item-info">
+        <strong>${item.title}</strong>
+        <div class="qty-controls">
+          <button class="qty-btn" onclick="changeQuantity(${idx}, -1)">−</button>
+          <span class="quantity">${item.quantity}</span>
+          <button class="qty-btn" onclick="changeQuantity(${idx}, 1)">+</button>
+        </div>
+      </div>
+      <div>
+        ${formatPrice(item.price * item.quantity, item.currency)}
+        <button class="remove-btn" onclick="changeQuantity(${idx}, -${item.quantity})">x</button>
       </div>`;
     cartList.appendChild(row);
   });
 
   cartTotal.textContent = formatPrice(total, currency);
-}
-
-function removeItem(idx) {
-  cart.splice(idx, 1);
-  localStorage.setItem('ds_cart', JSON.stringify(cart));
-  renderCart();
 }
 
 renderCart();
