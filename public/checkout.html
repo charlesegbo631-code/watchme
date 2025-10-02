@@ -63,13 +63,19 @@
       cursor: pointer;
       margin-top: 10px;
       width: 100%;
+      font-size: 16px;
+      font-weight: bold;
     }
-    input, textarea {
+    input, select, textarea {
       width: 100%;
       margin: 6px 0;
-      padding: 8px;
+      padding: 10px;
       border-radius: 6px;
       border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    h2, h3 {
+      margin-top: 0;
     }
   </style>
 </head>
@@ -85,13 +91,29 @@
 
     <!-- Customer Details -->
     <h3>Your Details</h3>
-    <input id="custName" placeholder="Full Name" required>
-    <input id="custEmail" type="email" placeholder="Email" required>
-    <input id="custPhone" placeholder="Phone" required>
-    <textarea id="custAddress" placeholder="Shipping Address" required></textarea>
+    <form id="checkoutForm">
+      <input id="custName" placeholder="Full Name" required>
+      <input id="custEmail" type="email" placeholder="Email" required>
+      <input id="custPhone" type="tel" placeholder="Phone Number" pattern="[0-9+ ]{6,}" required>
 
-    <!-- Payment Buttons -->
-    <button id="checkoutPaystack" class="cart-btn">Pay with Paystack</button>
+      <input id="custStreet" placeholder="Street Address" required>
+      <input id="custCity" placeholder="City" required>
+      <input id="custState" placeholder="State/Region" required>
+      <input id="custPostal" placeholder="Postal Code" required>
+      <select id="custCountry" required>
+        <option value="">Select Country</option>
+        <option value="NG">Nigeria</option>
+        <option value="US">United States</option>
+        <option value="GB">United Kingdom</option>
+        <option value="CA">Canada</option>
+        <option value="GH">Ghana</option>
+      </select>
+
+      <!-- Payment Button -->
+      <button id="checkoutPaystack" type="submit" class="cart-btn">
+        Pay with Paystack
+      </button>
+    </form>
   </div>
 
 <script>
@@ -151,20 +173,43 @@ function renderCart() {
 
 renderCart();
 
-// Paystack Checkout
-document.getElementById('checkoutPaystack').onclick = async () => {
-  if (cart.length === 0) { alert("Cart is empty"); return; }
+// Handle Paystack Checkout
+const form = document.getElementById("checkoutForm");
+
+form.onsubmit = async (e) => {
+  e.preventDefault(); // stop default submit
+
+  if (cart.length === 0) { 
+    alert("Cart is empty"); 
+    return; 
+  }
+
   const customer = {
-    name: custName.value,
-    email: custEmail.value,
-    phone: custPhone.value,
-    address: custAddress.value
+    name: custName.value.trim(),
+    email: custEmail.value.trim(),
+    phone: custPhone.value.trim(),
+    street: custStreet.value.trim(),
+    city: custCity.value.trim(),
+    state: custState.value.trim(),
+    postal: custPostal.value.trim(),
+    country: custCountry.value
   };
+
+  // Extra check for empty fields
+  for (let key in customer) {
+    if (!customer[key]) {
+      alert("Please fill in all fields.");
+      return;
+    }
+  }
+
+  // Send order to backend
   const res = await fetch(`${API}/create-paystack-order`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cartItems: cart, customer })
   });
+
   const data = await res.json();
   if (data.success && data.authorizationUrl) {
     window.location.href = data.authorizationUrl;

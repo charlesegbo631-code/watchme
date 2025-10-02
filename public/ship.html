@@ -527,7 +527,12 @@ document.querySelectorAll(".row-container").forEach(container => {
           <td>${o.customer_email||''}</td>
           <td>${o.customer_phone||''}</td>
           <td>${o.customer_address||''}</td>
-          <td>${o.items}</td>
+        <td>${
+  Array.isArray(o.items) 
+    ? o.items.map(i => `${i.title} (x${i.quantity})`).join(", ") 
+    : o.items
+}</td>
+
         <td>
   ${currentCurrency === "USD"
     ? `$${o.total_usd.toFixed(2)}`
