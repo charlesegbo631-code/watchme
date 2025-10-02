@@ -92,7 +92,6 @@
 
     <!-- Payment Buttons -->
     <button id="checkoutPaystack" class="cart-btn">Pay with Paystack</button>
-    <button id="checkoutOpay" class="cart-btn" style="background:#0045BA">Pay with OPay</button>
   </div>
 
 <script>
@@ -171,29 +170,6 @@ document.getElementById('checkoutPaystack').onclick = async () => {
     window.location.href = data.authorizationUrl;
   } else {
     alert("Paystack error: " + (data.error || "Unknown error"));
-  }
-};
-
-// OPay Checkout
-document.getElementById('checkoutOpay').onclick = async () => {
-  if (cart.length === 0) { alert("Cart is empty"); return; }
-  const customer = {
-    name: custName.value,
-    email: custEmail.value,
-    phone: custPhone.value,
-    address: custAddress.value
-  };
-  const res = await fetch(`${API}/create-opay-session`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cartItems: cart, customer })
-  });
-  const data = await res.json();
-  const payUrl = data?.data?.data?.link || data?.data?.data?.cashierUrl;
-  if (payUrl) {
-    window.location.href = payUrl;
-  } else {
-    alert("OPay error: " + (data.error || "Unknown error"));
   }
 };
 </script>
