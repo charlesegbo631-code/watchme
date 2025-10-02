@@ -77,6 +77,12 @@
     h2, h3 {
       margin-top: 0;
     }
+    .summary-row {
+      display:flex;
+      justify-content:space-between;
+      margin: 6px 0;
+    }
+    .summary-row strong { font-weight: bold; }
   </style>
 </head>
 <body>
@@ -85,7 +91,13 @@
 
     <!-- Cart Items -->
     <div id="cartList"></div>
-    <div style="display:flex;justify-content:space-between;font-weight:bold;margin-top:10px">
+    <div class="summary-row">
+      <span>Subtotal</span><span id="cartSubtotal">₦0.00</span>
+    </div>
+    <div class="summary-row">
+      <span>Shipping Fee</span><span id="shippingFee">₦0.00</span>
+    </div>
+    <div class="summary-row" style="font-weight:bold;font-size:16px;">
       <span>Total</span><span id="cartTotal">₦0.00</span>
     </div>
 
@@ -95,18 +107,28 @@
       <input id="custName" placeholder="Full Name" required>
       <input id="custEmail" type="email" placeholder="Email" required>
       <input id="custPhone" type="tel" placeholder="Phone Number" pattern="[0-9+ ]{6,}" required>
-
       <input id="custStreet" placeholder="Street Address">
       <input id="custCity" placeholder="City" required>
-      <input id="custState" placeholder="State/Region" required>
+
+      <!-- Nigerian States -->
+      <select id="custState" required>
+        <option value="">Select State</option>
+        <option value="Lagos">Lagos</option>
+        <option value="Abuja">Abuja (FCT)</option>
+        <option value="Kano">Kano</option>
+        <option value="Rivers">Rivers</option>
+        <option value="Oyo">Oyo</option>
+        <option value="Enugu">Enugu</option>
+        <option value="Anambra">Anambra</option>
+        <option value="Delta">Delta</option>
+        <option value="Kaduna">Kaduna</option>
+        <option value="Edo">Edo</option>
+        <!-- Add more states as needed -->
+      </select>
+
       <input id="custPostal" placeholder="Postal Code">
       <select id="custCountry" required>
-        <option value="">Select Country</option>
-        <option value="NG">Nigeria</option>
-        <option value="US">United States</option>
-        <option value="GB">United Kingdom</option>
-        <option value="CA">Canada</option>
-        <option value="GH">Ghana</option>
+        <option value="NG" selected>Nigeria</option>
       </select>
 
       <!-- Payment Button -->
@@ -121,13 +143,31 @@ const API = '/api';
 let cart = JSON.parse(localStorage.getItem('ds_cart') || '[]');
 
 const cartList = document.getElementById('cartList');
+const cartSubtotal = document.getElementById('cartSubtotal');
+const shippingFeeEl = document.getElementById('shippingFee');
 const cartTotal = document.getElementById('cartTotal');
+const stateSelect = document.getElementById('custState');
+
+// Shipping fees per state (example values in Naira)
+const shippingFees = {
+  "Lagos": 2000,
+  "Abuja": 2500,
+  "Kano": 3000,
+  "Rivers": 2800,
+  "Oyo": 2200,
+  "Enugu": 2500,
+  "Anambra": 2400,
+  "Delta": 2300,
+  "Kaduna": 2700,
+  "Edo": 2100
+};
+
+let subtotal = 0;
+let shipping = 0;
 
 // Format price depending on currency
-function formatPrice(amount, currency) {
-  return currency === "USD"
-    ? `$${amount.toFixed(2)}`
-    : amount.toLocaleString("en-NG", { style: "currency", currency: "NGN" });
+function formatPrice(amount, currency="NGN") {
+  return amount.toLocaleString("en-NG", { style: "currency", currency: "NGN" });
 }
 
 function saveCart() {
@@ -145,11 +185,10 @@ function changeQuantity(idx, delta) {
 
 function renderCart() {
   cartList.innerHTML = '';
-  let total = 0;
-  let currency = cart[0]?.currency || "USD"; // use first item’s currency as default
+  subtotal = 0;
 
   cart.forEach((item, idx) => {
-    total += item.price * item.quantity;
+    subtotal += item.price * item.quantity;
     const row = document.createElement('div');
     row.className = 'cart-item';
     row.innerHTML = `
@@ -162,14 +201,25 @@ function renderCart() {
         </div>
       </div>
       <div>
-        ${formatPrice(item.price * item.quantity, item.currency)}
+        ${formatPrice(item.price * item.quantity)}
         <button class="remove-btn" onclick="changeQuantity(${idx}, -${item.quantity})">x</button>
       </div>`;
     cartList.appendChild(row);
   });
 
-  cartTotal.textContent = formatPrice(total, currency);
+  updateTotals();
 }
+
+function updateTotals() {
+  const selectedState = stateSelect.value;
+  shipping = shippingFees[selectedState] || 0;
+
+  cartSubtotal.textContent = formatPrice(subtotal);
+  shippingFeeEl.textContent = formatPrice(shipping);
+  cartTotal.textContent = formatPrice(subtotal + shipping);
+}
+
+stateSelect.addEventListener('change', updateTotals);
 
 renderCart();
 
@@ -190,7 +240,7 @@ form.onsubmit = async (e) => {
     phone: custPhone.value.trim(),
     street: custStreet.value.trim(),
     city: custCity.value.trim(),
-    state: custState.value.trim(),
+    state: custState.value,
     postal: custPostal.value.trim(),
     country: custCountry.value
   };
@@ -203,11 +253,11 @@ form.onsubmit = async (e) => {
     }
   }
 
-  // Send order to backend
+  // Send order to backend (include shipping fee)
   const res = await fetch(`${API}/create-paystack-order`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cartItems: cart, customer })
+    body: JSON.stringify({ cartItems: cart, customer, shippingFee: shipping })
   });
 
   const data = await res.json();

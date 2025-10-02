@@ -111,6 +111,24 @@ async function fetchUsdToNgnRate() {
   if (!rate) throw new Error("Could not get NGN rate");
   return rate;
 }
+// ---------- Shipping Fees by Nigerian States ----------
+const SHIPPING_FEES = {
+  Lagos: 2000,
+  Abuja: 2500,
+  Rivers: 3000,
+  Kano: 2800,
+  Kaduna: 2500,
+  Oyo: 2200,
+  Ogun: 2000,
+  Enugu: 2700,
+  Anambra: 2700,
+  // ...add all states you want
+  default: 3500  // fallback if state not listed
+};
+
+function getShippingFee(state) {
+  return SHIPPING_FEES[state] || SHIPPING_FEES.default;
+}
 
 /**
  * Create a draft order in DB. Accepts customer with name/email/phone/address.
@@ -275,23 +293,38 @@ async function createPaystackOrderHandler(req, res) {
       return res.status(400).json({ success: false, message: "cartItems required" });
     }
 
-    // --- Calculate totals (assume cartItems[].price is already in NGN)
-    let ngnTotal = 0;
-    for (const it of cartItems) {
-      const price = Number(it.price) || 0; // assume price already NGN
-      const qty = parseInt(it.quantity || 1, 10);
-      ngnTotal += price * qty;
-    }
+// --- Calculate totals (assume cartItems[].price is already in NGN)
+let ngnTotal = 0;
+for (const it of cartItems) {
+  const price = Number(it.price) || 0; 
+  const qty = parseInt(it.quantity || 1, 10);
+  ngnTotal += price * qty;
+}
 
-    // Paystack requires amount in kobo
-    const totalKobo = Math.round(ngnTotal * 100);
+// ✅ Add shipping fee
+const shippingFee = getShippingFee(customer?.state);
+ngnTotal += shippingFee;
 
-    const payload = {
-      email: customer?.email || "guest@example.com",
-      amount: totalKobo, // kobo
-      currency: "NGN",
-      metadata: { cartItems, customer }
-    };
+// Paystack requires amount in kobo
+const totalKobo = Math.round(ngnTotal * 100);
+
+const payload = {
+  email: customer?.email || "guest@example.com",
+  amount: totalKobo, // kobo
+  currency: "NGN",
+  metadata: { cartItems, customer, shippingFee }
+};
+
+// Save draft order
+await createDraftOrder({
+  paymentId: response.data.data.reference,
+  cartItems,
+  customer,
+  usdTotalCents: 0,        
+  koboTotal: totalKobo,
+  supplierTotal: 0,        
+  profitCents: 0           
+});
 
     const url = "https://api.paystack.co/transaction/initialize";
     const headers = {
