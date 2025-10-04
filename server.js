@@ -259,6 +259,31 @@ app.post("/api/add-product", async (req, res) => {
     res.status(500).json({ success: false, error: "DB insert error" });
   }
 });
+app.put("/api/update-product/:id", async (req, res) => {
+  const { id } = req.params;
+  const { price, img } = req.body; // frontend sends price in current currency
+  try {
+    let usdPriceCents = null;
+
+    // Always store price in USD cents in DB
+    if (req.body.currency === "USD") {
+      usdPriceCents = Math.round(price * 100);
+    } else if (req.body.currency === "NGN") {
+      const rate = await fetchUsdToNgnRate();
+      usdPriceCents = Math.round((price / rate) * 100);
+    }
+
+    await db.run(
+      `UPDATE products SET price_usd_cents = ?, img = ? WHERE id = ?`,
+      [usdPriceCents, img, id]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ Update failed:", err);
+    res.json({ success: false, error: err.message });
+  }
+});
 
 app.delete("/api/delete-product/:id", async (req, res) => {
   try {
@@ -314,17 +339,6 @@ const payload = {
   currency: "NGN",
   metadata: { cartItems, customer, shippingFee }
 };
-
-// Save draft order
-await createDraftOrder({
-  paymentId: response.data.data.reference,
-  cartItems,
-  customer,
-  usdTotalCents: 0,        
-  koboTotal: totalKobo,
-  supplierTotal: 0,        
-  profitCents: 0           
-});
 
     const url = "https://api.paystack.co/transaction/initialize";
     const headers = {

@@ -392,29 +392,71 @@ document.getElementById('whatsappBtn').addEventListener('click', () => {
     else alert("Delete failed: "+data.error);
   }
   window.deleteProduct = deleteProduct;
+  async function saveProduct(id) {
+  const priceInput = document.querySelector(`.edit-price[data-id="${id}"]`);
+  const imgInput = document.querySelector(`.edit-img[data-id="${id}"]`);
 
-  // ===== Render Admin Products =====
-  async function loadProductsForAdmin(){
-    const res = await fetch(`${API}/products`); const data = await res.json();
-    if(data.success){
-      productsTableBody.innerHTML='';
-      data.products.forEach(p=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${p.title}</td>
-      <td>
-  ${currentCurrency === "USD"
-    ? `$${p.price_usd.toFixed(2)}`
-    : p.price_ngn.toLocaleString("en-NG", { style: "currency", currency: "NGN" })}
-</td>
+  const newPrice = parseFloat(priceInput.value);
+  const newImg = imgInput.value.trim();
 
-
-          <td>${p.supplier_sku||''}</td>
-          <td><button onclick="deleteProduct('${p.id}')" style="background:var(--danger);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer">Delete</button></td>`;
-        productsTableBody.appendChild(tr);
-      });
-    }
+  if (isNaN(newPrice) || !newImg) {
+    alert("⚠️ Price or Image URL invalid.");
+    return;
   }
+
+  const res = await fetch(`${API}/update-product/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      price: newPrice,
+      img: newImg,
+      currency: currentCurrency
+    })
+  });
+
+  const data = await res.json();
+  if (data.success) {
+    alert("✅ Product updated!");
+    loadProductsForAdmin();
+    loadProducts();
+  } else {
+    alert("❌ Update failed: " + data.error);
+  }
+}
+window.saveProduct = saveProduct;
+
+
+async function loadProductsForAdmin() {
+  const res = await fetch(`${API}/products`);
+  const data = await res.json();
+  if (!data.success) return;
+
+  productsTableBody.innerHTML = '';
+  data.products.forEach(p => {
+    const tr = document.createElement('tr');
+
+    tr.innerHTML = `
+      <td>${p.title}</td>
+      <td>
+        ${currentCurrency === "USD"
+          ? `<input type="number" value="${p.price_usd}" step="0.01" data-id="${p.id}" class="edit-price" />`
+          : `<input type="number" value="${p.price_ngn}" step="0.01" data-id="${p.id}" class="edit-price" />`}
+      </td>
+      <td>${p.supplier_sku || ''}</td>
+      <td>
+        <input type="text" value="${p.img}" data-id="${p.id}" class="edit-img" style="width:120px" />
+      </td>
+      <td>
+        <button onclick="saveProduct('${p.id}')"
+          style="background:var(--accent);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer">Save</button>
+        <button onclick="deleteProduct('${p.id}')"
+          style="background:var(--danger);color:#fff;border:none;padding:4px 8px;border-radius:6px;cursor:pointer">Delete</button>
+      </td>
+    `;
+    productsTableBody.appendChild(tr);
+  });
+}
+
 
   // ===== Cart =====
   function saveCart(){ localStorage.setItem('ds_cart', JSON.stringify(cart)); updateCartSummary(); }
