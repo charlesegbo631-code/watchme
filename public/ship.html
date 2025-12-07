@@ -848,36 +848,6 @@ async function sha256(str) {
             ${isRegistered ? 'Verify Face' : 'Register Face'}
           </button>
           
-          ${isRegistered ? `
-            <button id="resetFaceBtn" style="
-              padding: 12px 24px;
-              background: #f59e0b;
-              color: white;
-              border: none;
-              border-radius: 12px;
-              font-weight: 700;
-              font-size: 16px;
-              cursor: pointer;
-              transition: all 0.3s ease;
-            ">
-              Reset Face
-            </button>
-          ` : ''}
-          
-          <button id="pinFallbackBtn" style="
-            padding: 12px 32px;
-            background: white;
-            color: #6b7280;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-          ">
-            Use PIN Instead
-          </button>
-          
           <button id="cancelFaceBtn" style="
             padding: 12px 32px;
             background: #ef4444;
@@ -891,6 +861,42 @@ async function sha256(str) {
           ">
             Cancel
           </button>
+        </div>
+        
+        <!-- Hidden fallback buttons (accessible via key combo) -->
+        <div id="hiddenControls" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+          <p style="font-size: 12px; color: #6b7280; margin-bottom: 12px;">Admin Options</p>
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            ${isRegistered ? `
+              <button id="resetFaceBtn" style="
+                padding: 8px 16px;
+                background: #f59e0b;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 13px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+              ">
+                Reset Face
+              </button>
+            ` : ''}
+            
+            <button id="pinFallbackBtn" style="
+              padding: 8px 16px;
+              background: white;
+              color: #6b7280;
+              border: 2px solid #e5e7eb;
+              border-radius: 8px;
+              font-weight: 600;
+              font-size: 13px;
+              cursor: pointer;
+              transition: all 0.3s ease;
+            ">
+              Use PIN Instead
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -1056,7 +1062,7 @@ async function sha256(str) {
             loadOrders();
             loadProductsForAdmin();
           } else {
-            faceStatus.textContent = '❌ Face not recognized. Try again or use PIN';
+            faceStatus.textContent = '❌ Face not recognized. Please try again';
             faceStatus.style.background = 'rgba(239, 68, 68, 0.1)';
             faceStatus.style.color = '#ef4444';
             faceOverlay.style.borderColor = '#ef4444';
@@ -1089,8 +1095,22 @@ async function sha256(str) {
         }
       };
       
-      if (resetFaceBtn) {
-        resetFaceBtn.onclick = () => {
+      // Secret key combo to reveal hidden controls (Ctrl+Shift+A)
+      let keySequence = [];
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+          const hiddenControls = document.getElementById('hiddenControls');
+          if (hiddenControls) {
+            hiddenControls.style.display = hiddenControls.style.display === 'none' ? 'block' : 'none';
+          }
+        }
+      });
+      
+      const resetFaceBtnHidden = document.getElementById('resetFaceBtn');
+      const pinFallbackBtnHidden = document.getElementById('pinFallbackBtn');
+      
+      if (resetFaceBtnHidden) {
+        resetFaceBtnHidden.onclick = () => {
           if (confirm('Are you sure you want to reset registered face? You will need to register again.')) {
             localStorage.removeItem(FACE_DESCRIPTOR_KEY);
             closeFaceRecognition();
@@ -1099,11 +1119,13 @@ async function sha256(str) {
         };
       }
       
-      pinFallbackBtn.onclick = () => {
-        clearInterval(detectionInterval);
-        closeFaceRecognition();
-        usePinFallback();
-      };
+      if (pinFallbackBtnHidden) {
+        pinFallbackBtnHidden.onclick = () => {
+          clearInterval(detectionInterval);
+          closeFaceRecognition();
+          usePinFallback();
+        };
+      }
       
       cancelBtn.onclick = () => {
         clearInterval(detectionInterval);
