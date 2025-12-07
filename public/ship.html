@@ -560,21 +560,15 @@ label input:focus {
   
   h2 { font-size: 26px; }
   
-  #whatsappBtn {
+  #adminAccessBtn, #whatsappBtn {
     width: 50px;
     height: 50px;
     font-size: 20px;
     bottom: 16px;
   }
   
-  #adminAccessBtn { right: 16px;
-    width: 1px;
-  height: 1px; 
-     font-size: 20px;
-    bottom: 16px;
-}
+  #adminAccessBtn { right: 16px; }
   #whatsappBtn { right: 76px; }
-
 }
 
 @media (max-width: 400px) {
@@ -607,7 +601,7 @@ label input:focus {
   </div>
 </header>
 
-<button id="adminAccessBtn" title="Admin Panel" >⚙️</button>
+<button id="adminAccessBtn" title="Admin Panel">⚙️</button>
 <button id="whatsappBtn" title="Chat with Dealer">💬</button>
 
 <div class="main">
@@ -684,6 +678,14 @@ label input:focus {
 </div>
 
 <script>
+ 
+document.addEventListener('keydown', (e) => {
+  if (e.shiftKey && e.key === 'A') {
+    document.getElementById("adminAccessBtn").style.display = "flex";
+  }
+});
+
+
 // ===== CONFIG =====
 const ADMIN_PIN_HASH = "4d928d91f8095708c95d2e05750a142dc849c84d0897bb9f07605e83a156232f"; 
 const API = '/api';
