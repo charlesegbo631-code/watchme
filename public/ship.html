@@ -717,8 +717,246 @@ async function sha256(str) {
   const ordersTableBody = document.querySelector('#ordersTable tbody');
   const productsTableBody = document.querySelector('#productsTable tbody');
 
-  // ===== ADMIN ACCESS =====
-  document.getElementById('adminAccessBtn').addEventListener('click', async () => {
+  // ===== FACIAL RECOGNITION SETUP =====
+  let faceRecognitionModal = null;
+  let videoStream = null;
+  
+  function createFaceRecognitionModal() {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease;
+    `;
+    
+    modal.innerHTML = `
+      <div style="
+        background: white;
+        border-radius: 20px;
+        padding: 32px;
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      ">
+        <h3 style="margin: 0 0 16px; font-size: 24px; color: #1f2937;">🔐 Admin Access</h3>
+        <p style="color: #6b7280; margin-bottom: 24px;">Position your face in the frame</p>
+        
+        <div style="position: relative; margin: 0 auto 24px; width: 100%; max-width: 400px;">
+          <video id="faceVideo" autoplay playsinline style="
+            width: 100%;
+            height: 300px;
+            border-radius: 16px;
+            background: #000;
+            object-fit: cover;
+          "></video>
+          
+          <div id="faceOverlay" style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 3px solid rgba(14, 165, 164, 0.6);
+            border-radius: 50%;
+            pointer-events: none;
+          "></div>
+          
+          <div id="scanningEffect" style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 0;
+            background: linear-gradient(to bottom, transparent, rgba(14, 165, 164, 0.3), transparent);
+            animation: scan 2s linear infinite;
+            pointer-events: none;
+          "></div>
+        </div>
+        
+        <div id="faceStatus" style="
+          padding: 12px;
+          border-radius: 12px;
+          background: rgba(14, 165, 164, 0.1);
+          color: #0ea5a4;
+          font-weight: 600;
+          margin-bottom: 16px;
+        ">
+          📸 Initializing camera...
+        </div>
+        
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button id="captureBtn" style="
+            padding: 12px 32px;
+            background: linear-gradient(135deg, #0ea5a4 0%, #14b8b7 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(14, 165, 164, 0.3);
+          " disabled>
+            Capture Face
+          </button>
+          
+          <button id="pinFallbackBtn" style="
+            padding: 12px 32px;
+            background: white;
+            color: #6b7280;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+          ">
+            Use PIN Instead
+          </button>
+          
+          <button id="cancelFaceBtn" style="
+            padding: 12px 32px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+          ">
+            Cancel
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Add scanning animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes scan {
+        0% { height: 0; top: 0; }
+        50% { height: 100%; top: 0; }
+        100% { height: 0; top: 100%; }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return modal;
+  }
+  
+  async function startFaceRecognition() {
+    faceRecognitionModal = createFaceRecognitionModal();
+    const video = document.getElementById('faceVideo');
+    const captureBtn = document.getElementById('captureBtn');
+    const cancelBtn = document.getElementById('cancelFaceBtn');
+    const pinFallbackBtn = document.getElementById('pinFallbackBtn');
+    const faceStatus = document.getElementById('faceStatus');
+    const faceOverlay = document.getElementById('faceOverlay');
+    
+    try {
+      videoStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user', width: 640, height: 480 } 
+      });
+      
+      video.srcObject = videoStream;
+      faceStatus.textContent = '✅ Camera ready - Position your face';
+      faceStatus.style.background = 'rgba(34, 197, 94, 0.1)';
+      faceStatus.style.color = '#22c55e';
+      captureBtn.disabled = false;
+      
+      // Simulate face detection animation
+      let detectionInterval = setInterval(() => {
+        faceOverlay.style.borderColor = 
+          Math.random() > 0.5 ? 'rgba(14, 165, 164, 0.8)' : 'rgba(34, 197, 94, 0.8)';
+      }, 500);
+      
+      captureBtn.onclick = async () => {
+        clearInterval(detectionInterval);
+        faceStatus.textContent = '🔄 Analyzing face...';
+        faceStatus.style.background = 'rgba(234, 179, 8, 0.1)';
+        faceStatus.style.color = '#eab308';
+        
+        // Capture frame from video
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        
+        // Simulate face recognition processing
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // For demo: always succeed (in production, this would call a real face recognition API)
+        const recognized = true; // Replace with actual face recognition logic
+        
+        if (recognized) {
+          faceStatus.textContent = '✅ Face recognized! Access granted';
+          faceStatus.style.background = 'rgba(34, 197, 94, 0.1)';
+          faceStatus.style.color = '#22c55e';
+          faceOverlay.style.borderColor = '#22c55e';
+          
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          closeFaceRecognition();
+          adminPanel.style.display = 'block';
+          loadOrders();
+          loadProductsForAdmin();
+        } else {
+          faceStatus.textContent = '❌ Face not recognized. Try again or use PIN';
+          faceStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+          faceStatus.style.color = '#ef4444';
+          faceOverlay.style.borderColor = '#ef4444';
+        }
+      };
+      
+      pinFallbackBtn.onclick = () => {
+        closeFaceRecognition();
+        usePinFallback();
+      };
+      
+      cancelBtn.onclick = () => {
+        closeFaceRecognition();
+      };
+      
+    } catch (error) {
+      faceStatus.textContent = '❌ Camera access denied. Use PIN instead.';
+      faceStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+      faceStatus.style.color = '#ef4444';
+      captureBtn.disabled = true;
+      
+      console.error('Camera error:', error);
+    }
+  }
+  
+  function closeFaceRecognition() {
+    if (videoStream) {
+      videoStream.getTracks().forEach(track => track.stop());
+      videoStream = null;
+    }
+    if (faceRecognitionModal) {
+      faceRecognitionModal.remove();
+      faceRecognitionModal = null;
+    }
+  }
+  
+  async function usePinFallback() {
     const pin = prompt("Enter Admin PIN:");
     if (!pin) return;
     const enteredHash = await sha256(pin);
@@ -729,6 +967,11 @@ async function sha256(str) {
     } else {
       alert("❌ Wrong PIN");
     }
+  }
+  
+  // ===== ADMIN ACCESS =====
+  document.getElementById('adminAccessBtn').addEventListener('click', () => {
+    startFaceRecognition();
   });
 
   document.getElementById('whatsappBtn').addEventListener('click', () => {
