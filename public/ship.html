@@ -171,7 +171,7 @@ h2::after {
 .card {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
-  padding: 20px;
+  padding: 16px;
   border-radius: 20px;
   box-shadow: var(--shadow-md);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -205,10 +205,10 @@ h2::after {
 
 .card img {
   width: 100%;
-  height: 220px;
+  height: 180px;
   object-fit: cover;
   border-radius: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   transition: transform 0.3s ease;
 }
 
@@ -217,22 +217,23 @@ h2::after {
 }
 
 .card h4 {
-  margin: 0 0 8px;
-  font-size: 18px;
+  margin: 0 0 6px;
+  font-size: 16px;
   font-weight: 700;
   color: #1f2937;
+  line-height: 1.3;
 }
 
 .small {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .price {
   font-weight: 800;
-  font-size: 24px;
-  margin: 12px 0;
+  font-size: 20px;
+  margin: 8px 0;
   background: var(--gradient-accent);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -243,24 +244,24 @@ h2::after {
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .qty-wrapper {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 14px;
+  gap: 10px;
+  font-size: 13px;
   color: var(--muted);
   font-weight: 600;
 }
 
 .qty-input {
-  width: 70px;
-  padding: 8px 12px;
+  width: 60px;
+  padding: 6px 10px;
   border: 2px solid var(--border);
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 14px;
   text-align: center;
   font-weight: 600;
   transition: all 0.2s ease;
@@ -282,10 +283,10 @@ h2::after {
   background: var(--gradient-accent);
   color: white;
   border: none;
-  padding: 12px 16px;
+  padding: 10px 12px;
   border-radius: 12px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(14, 165, 164, 0.3);
@@ -338,7 +339,8 @@ h2::after {
 }
 
 .grid-row .card {
-  flex: 0 0 75%;
+  flex: 0 0 85%;
+  max-width: 320px;
   scroll-snap-align: start;
 }
 
