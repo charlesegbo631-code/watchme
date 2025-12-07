@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
 <style>
 :root {
@@ -720,6 +721,27 @@ async function sha256(str) {
   // ===== FACIAL RECOGNITION SETUP =====
   let faceRecognitionModal = null;
   let videoStream = null;
+  let modelsLoaded = false;
+  const FACE_DESCRIPTOR_KEY = 'admin_face_descriptor';
+  
+  // Load face-api.js models
+  async function loadFaceModels() {
+    if (modelsLoaded) return true;
+    
+    try {
+      const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+      ]);
+      modelsLoaded = true;
+      return true;
+    } catch (error) {
+      console.error('Failed to load face models:', error);
+      return false;
+    }
+  }
   
   function createFaceRecognitionModal() {
     const modal = document.createElement('div');
@@ -738,6 +760,8 @@ async function sha256(str) {
       animation: fadeIn 0.3s ease;
     `;
     
+    const isRegistered = localStorage.getItem(FACE_DESCRIPTOR_KEY);
+    
     modal.innerHTML = `
       <div style="
         background: white;
@@ -748,8 +772,12 @@ async function sha256(str) {
         text-align: center;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       ">
-        <h3 style="margin: 0 0 16px; font-size: 24px; color: #1f2937;">🔐 Admin Access</h3>
-        <p style="color: #6b7280; margin-bottom: 24px;">Position your face in the frame</p>
+        <h3 style="margin: 0 0 16px; font-size: 24px; color: #1f2937;">
+          ${isRegistered ? '🔐 Admin Access' : '📝 Register Admin Face'}
+        </h3>
+        <p style="color: #6b7280; margin-bottom: 24px;">
+          ${isRegistered ? 'Position your face in the frame' : 'First time setup - Register your face'}
+        </p>
         
         <div style="position: relative; margin: 0 auto 24px; width: 100%; max-width: 400px;">
           <video id="faceVideo" autoplay playsinline style="
@@ -759,6 +787,15 @@ async function sha256(str) {
             background: #000;
             object-fit: cover;
           "></video>
+          
+          <canvas id="faceCanvas" style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 300px;
+            pointer-events: none;
+          "></canvas>
           
           <div id="faceOverlay" style="
             position: absolute;
@@ -792,10 +829,10 @@ async function sha256(str) {
           font-weight: 600;
           margin-bottom: 16px;
         ">
-          📸 Initializing camera...
+          📸 Loading face recognition models...
         </div>
         
-        <div style="display: flex; gap: 12px; justify-content: center;">
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
           <button id="captureBtn" style="
             padding: 12px 32px;
             background: linear-gradient(135deg, #0ea5a4 0%, #14b8b7 100%);
@@ -808,8 +845,24 @@ async function sha256(str) {
             transition: all 0.3s ease;
             box-shadow: 0 4px 12px rgba(14, 165, 164, 0.3);
           " disabled>
-            Capture Face
+            ${isRegistered ? 'Verify Face' : 'Register Face'}
           </button>
+          
+          ${isRegistered ? `
+            <button id="resetFaceBtn" style="
+              padding: 12px 24px;
+              background: #f59e0b;
+              color: white;
+              border: none;
+              border-radius: 12px;
+              font-weight: 700;
+              font-size: 16px;
+              cursor: pointer;
+              transition: all 0.3s ease;
+            ">
+              Reset Face
+            </button>
+          ` : ''}
           
           <button id="pinFallbackBtn" style="
             padding: 12px 32px;
@@ -862,76 +915,198 @@ async function sha256(str) {
     return modal;
   }
   
+  async function detectFaceInVideo(video) {
+    const detections = await faceapi
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+    
+    return detections;
+  }
+  
+  function saveFaceDescriptor(descriptor) {
+    localStorage.setItem(FACE_DESCRIPTOR_KEY, JSON.stringify(Array.from(descriptor)));
+  }
+  
+  function getStoredFaceDescriptor() {
+    const stored = localStorage.getItem(FACE_DESCRIPTOR_KEY);
+    if (!stored) return null;
+    return new Float32Array(JSON.parse(stored));
+  }
+  
+  function compareFaces(descriptor1, descriptor2) {
+    const distance = faceapi.euclideanDistance(descriptor1, descriptor2);
+    // Lower distance = more similar. Threshold: 0.6 (adjust for strictness)
+    return distance < 0.6;
+  }
+  
   async function startFaceRecognition() {
     faceRecognitionModal = createFaceRecognitionModal();
     const video = document.getElementById('faceVideo');
+    const canvas = document.getElementById('faceCanvas');
     const captureBtn = document.getElementById('captureBtn');
     const cancelBtn = document.getElementById('cancelFaceBtn');
     const pinFallbackBtn = document.getElementById('pinFallbackBtn');
+    const resetFaceBtn = document.getElementById('resetFaceBtn');
     const faceStatus = document.getElementById('faceStatus');
     const faceOverlay = document.getElementById('faceOverlay');
     
+    const isRegistered = localStorage.getItem(FACE_DESCRIPTOR_KEY);
+    
     try {
+      // Load models first
+      faceStatus.textContent = '🔄 Loading AI models...';
+      const loaded = await loadFaceModels();
+      
+      if (!loaded) {
+        faceStatus.textContent = '❌ Failed to load models. Use PIN instead.';
+        faceStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+        faceStatus.style.color = '#ef4444';
+        captureBtn.disabled = true;
+        return;
+      }
+      
+      // Start camera
       videoStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user', width: 640, height: 480 } 
       });
       
       video.srcObject = videoStream;
-      faceStatus.textContent = '✅ Camera ready - Position your face';
+      
+      await new Promise(resolve => {
+        video.onloadedmetadata = resolve;
+      });
+      
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const displaySize = { width: canvas.offsetWidth, height: canvas.offsetHeight };
+      faceapi.matchDimensions(canvas, displaySize);
+      
+      faceStatus.textContent = '✅ Ready - Position your face in the circle';
       faceStatus.style.background = 'rgba(34, 197, 94, 0.1)';
       faceStatus.style.color = '#22c55e';
       captureBtn.disabled = false;
       
-      // Simulate face detection animation
-      let detectionInterval = setInterval(() => {
-        faceOverlay.style.borderColor = 
-          Math.random() > 0.5 ? 'rgba(14, 165, 164, 0.8)' : 'rgba(34, 197, 94, 0.8)';
-      }, 500);
+      // Real-time face detection
+      let detectionInterval = setInterval(async () => {
+        const detection = await detectFaceInVideo(video);
+        
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (detection) {
+          const resizedDetections = faceapi.resizeResults(detection, displaySize);
+          faceapi.draw.drawDetections(canvas, resizedDetections);
+          faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+          
+          faceOverlay.style.borderColor = 'rgba(34, 197, 94, 0.8)';
+          faceStatus.textContent = isRegistered 
+            ? '✅ Face detected - Click to verify' 
+            : '✅ Face detected - Click to register';
+          faceStatus.style.background = 'rgba(34, 197, 94, 0.1)';
+          faceStatus.style.color = '#22c55e';
+        } else {
+          faceOverlay.style.borderColor = 'rgba(14, 165, 164, 0.6)';
+        }
+      }, 100);
       
       captureBtn.onclick = async () => {
         clearInterval(detectionInterval);
+        captureBtn.disabled = true;
         faceStatus.textContent = '🔄 Analyzing face...';
         faceStatus.style.background = 'rgba(234, 179, 8, 0.1)';
         faceStatus.style.color = '#eab308';
         
-        // Capture frame from video
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
+        const detection = await detectFaceInVideo(video);
         
-        // Simulate face recognition processing
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (!detection) {
+          faceStatus.textContent = '❌ No face detected. Try again.';
+          faceStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+          faceStatus.style.color = '#ef4444';
+          captureBtn.disabled = false;
+          detectionInterval = setInterval(async () => {
+            const d = await detectFaceInVideo(video);
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (d) {
+              const resized = faceapi.resizeResults(d, { width: canvas.offsetWidth, height: canvas.offsetHeight });
+              faceapi.draw.drawDetections(canvas, resized);
+              faceapi.draw.drawFaceLandmarks(canvas, resized);
+            }
+          }, 100);
+          return;
+        }
         
-        // For demo: always succeed (in production, this would call a real face recognition API)
-        const recognized = true; // Replace with actual face recognition logic
-        
-        if (recognized) {
-          faceStatus.textContent = '✅ Face recognized! Access granted';
+        if (isRegistered) {
+          // Verify face
+          const storedDescriptor = getStoredFaceDescriptor();
+          const match = compareFaces(detection.descriptor, storedDescriptor);
+          
+          if (match) {
+            faceStatus.textContent = '✅ Face verified! Access granted';
+            faceStatus.style.background = 'rgba(34, 197, 94, 0.1)';
+            faceStatus.style.color = '#22c55e';
+            faceOverlay.style.borderColor = '#22c55e';
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            closeFaceRecognition();
+            adminPanel.style.display = 'block';
+            loadOrders();
+            loadProductsForAdmin();
+          } else {
+            faceStatus.textContent = '❌ Face not recognized. Try again or use PIN';
+            faceStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+            faceStatus.style.color = '#ef4444';
+            faceOverlay.style.borderColor = '#ef4444';
+            captureBtn.disabled = false;
+            detectionInterval = setInterval(async () => {
+              const d = await detectFaceInVideo(video);
+              const ctx = canvas.getContext('2d');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              if (d) {
+                const resized = faceapi.resizeResults(d, { width: canvas.offsetWidth, height: canvas.offsetHeight });
+                faceapi.draw.drawDetections(canvas, resized);
+                faceapi.draw.drawFaceLandmarks(canvas, resized);
+              }
+            }, 100);
+          }
+        } else {
+          // Register new face
+          saveFaceDescriptor(detection.descriptor);
+          faceStatus.textContent = '✅ Face registered successfully!';
           faceStatus.style.background = 'rgba(34, 197, 94, 0.1)';
           faceStatus.style.color = '#22c55e';
           faceOverlay.style.borderColor = '#22c55e';
           
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 1500));
           
           closeFaceRecognition();
           adminPanel.style.display = 'block';
           loadOrders();
           loadProductsForAdmin();
-        } else {
-          faceStatus.textContent = '❌ Face not recognized. Try again or use PIN';
-          faceStatus.style.background = 'rgba(239, 68, 68, 0.1)';
-          faceStatus.style.color = '#ef4444';
-          faceOverlay.style.borderColor = '#ef4444';
         }
       };
       
+      if (resetFaceBtn) {
+        resetFaceBtn.onclick = () => {
+          if (confirm('Are you sure you want to reset registered face? You will need to register again.')) {
+            localStorage.removeItem(FACE_DESCRIPTOR_KEY);
+            closeFaceRecognition();
+            alert('✅ Face data cleared. Click admin button to register again.');
+          }
+        };
+      }
+      
       pinFallbackBtn.onclick = () => {
+        clearInterval(detectionInterval);
         closeFaceRecognition();
         usePinFallback();
       };
       
       cancelBtn.onclick = () => {
+        clearInterval(detectionInterval);
         closeFaceRecognition();
       };
       
