@@ -737,6 +737,9 @@ async function sha256(str) {
   const ordersTableBody = document.querySelector('#ordersTable tbody');
   const productsTableBody = document.querySelector('#productsTable tbody');
 
+  // fetch CSRF token for admin actions
+  await fetchCsrfToken();
+
   // ===== FACIAL RECOGNITION SETUP =====
   let faceRecognitionModal = null;
   let videoStream = null;
@@ -1075,9 +1078,11 @@ async function sha256(str) {
             faceOverlay.style.borderColor = '#22c55e';
             
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
+
             closeFaceRecognition();
             adminPanel.style.display = 'block';
+            // ensure we have a fresh CSRF token for modifying requests
+            await fetchCsrfToken();
             loadOrders();
             loadProductsForAdmin();
           } else {
