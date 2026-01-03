@@ -689,6 +689,17 @@ document.addEventListener('keydown', (e) => {
 // ===== CONFIG =====
 const ADMIN_PIN_HASH = "4d928d91f8095708c95d2e05750a142dc849c84d0897bb9f07605e83a156232f"; 
 const API = '/api';
+let CSRF_TOKEN = null;
+
+async function fetchCsrfToken() {
+  try {
+    const r = await fetch(`${API}/csrf-token`, { credentials: 'same-origin' });
+    const j = await r.json();
+    if (j && j.csrfToken) CSRF_TOKEN = j.csrfToken;
+  } catch (e) {
+    console.warn('Could not fetch CSRF token', e);
+  }
+}
 let PRODUCTS = [], cart = JSON.parse(localStorage.getItem('ds_cart') || '[]');
 let currentCurrency = "NGN";
 let rates = { USD: 1, NGN: 1500 };
@@ -1209,8 +1220,10 @@ async function sha256(str) {
       adminStatus.style.color="red"; return;
     }
 
+    const headers = {"Content-Type":"application/json"};
+    if (CSRF_TOKEN) headers['x-csrf-token'] = CSRF_TOKEN;
     const res = await fetch(`${API}/add-product`,{
-      method:"POST", headers:{"Content-Type":"application/json"},
+      method:"POST", headers, credentials: 'same-origin',
       body:JSON.stringify({title,price,supplierCost,supplier_sku: sku,img})
     });
     const data = await res.json();
@@ -1227,7 +1240,9 @@ async function sha256(str) {
 
   async function deleteProduct(id){
     if(!confirm("Delete this product?")) return;
-    const res = await fetch(`${API}/delete-product/${id}`,{method:"DELETE"});
+    const headers = {};
+    if (CSRF_TOKEN) headers['x-csrf-token'] = CSRF_TOKEN;
+    const res = await fetch(`${API}/delete-product/${id}`,{method:"DELETE", headers, credentials: 'same-origin'});
     const data = await res.json();
     if(data.success){ loadProductsForAdmin(); loadProducts(); }
     else alert("Delete failed: "+data.error);
@@ -1245,9 +1260,11 @@ async function sha256(str) {
       return;
     }
 
+    const headers = { "Content-Type": "application/json" };
+    if (CSRF_TOKEN) headers['x-csrf-token'] = CSRF_TOKEN;
     const res = await fetch(`${API}/update-product/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers, credentials: 'same-origin',
       body: JSON.stringify({
         price: newPrice,
         img: newImg,

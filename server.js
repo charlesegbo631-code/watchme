@@ -8,6 +8,11 @@ const sqlite3 = require("sqlite3").verbose();
 const { open } = require("sqlite");
 const bodyParser = require("body-parser");
 const crypto = require("crypto");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
+const csurf = require("csurf");
+const csrfApi = csurf({ cookie: true });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -83,8 +88,35 @@ let db;
 })();
 
 // Basic middleware
+app.use(helmet({ contentSecurityPolicy: false }));
+app.set("trust proxy", 1);
+app.use(cookieParser());
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), { index: "ship.html" }));
+
+// Rate limiter for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/", apiLimiter);
+
+// CSRF protection for non-API routes (APIs often use other auth methods)
+const csrfProtection = csurf({ cookie: { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production" } });
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) return next();
+  return csrfProtection(req, res, next);
+});
+
+// CSRF error handler
+app.use(function (err, req, res, next) {
+  if (err && err.code === "EBADCSRFTOKEN") {
+    return res.status(403).json({ success: false, message: "Invalid CSRF token" });
+  }
+  next(err);
+});
 
 // ---------- Helpers ----------
 function toCents(value) {
@@ -226,7 +258,7 @@ app.get("/api/orders", async (req, res) => {
   }
 });
 
-app.post("/api/add-product", async (req, res) => {
+app.post("/api/add-product", csrfApi, async (req, res) => {
   try {
     const { id, title, price, supplierCost, supplier_sku, img } = req.body;
     if (!title || price == null) {
@@ -259,7 +291,7 @@ app.post("/api/add-product", async (req, res) => {
     res.status(500).json({ success: false, error: "DB insert error" });
   }
 });
-app.put("/api/update-product/:id", async (req, res) => {
+app.put("/api/update-product/:id", csrfApi, async (req, res) => {
   const { id } = req.params;
   const { price, img } = req.body; // frontend sends price in current currency
   try {
@@ -285,7 +317,7 @@ app.put("/api/update-product/:id", async (req, res) => {
   }
 });
 
-app.delete("/api/delete-product/:id", async (req, res) => {
+app.delete("/api/delete-product/:id", csrfApi, async (req, res) => {
   try {
     const { id } = req.params;
     await db.run("DELETE FROM products WHERE id = ?", id);
@@ -375,7 +407,7 @@ const payload = {
   }
 }
 
-app.post("/api/create-paystack-order", createPaystackOrderHandler);
+app.post("/api/create-paystack-order", csrfApi, createPaystackOrderHandler);
 
 // ✅ Verify Paystack Payment
 async function verifyPaystackPayment(req, res) {
@@ -500,8 +532,13 @@ async function createOpayOrderHandler(req, res) {
   }
 }
 
-app.post("/api/create-opay-order", createOpayOrderHandler);
-app.post("/api/create-opay-session", createOpayOrderHandler);
+app.post("/api/create-opay-order", csrfApi, createOpayOrderHandler);
+app.post("/api/create-opay-session", csrfApi, createOpayOrderHandler);
+
+// Provide CSRF token for SPA/API clients (sets cookie + returns token)
+app.get('/api/csrf-token', csrfApi, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 // ---------- Serve Frontend ----------
 app.get("/", (req, res) => {
